@@ -123,7 +123,10 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     private val signatureConflictReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != UpdateInstallReceiver.ACTION_SIGNATURE_CONFLICT) return
-            runOnUiThread { showSignatureConflictDialog() }
+            val apkSavedToDownloads =
+                intent.getBooleanExtra(UpdateInstallReceiver.EXTRA_APK_SAVED_TO_DOWNLOADS, false)
+            val apkUrl = intent.getStringExtra(UpdateInstallReceiver.EXTRA_APK_URL)
+            runOnUiThread { showSignatureConflictDialog(apkSavedToDownloads, apkUrl) }
         }
     }
 
@@ -1287,9 +1290,9 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
                 if (result.success) hideUpdateBanner()
                 showInstallSnackbar(result.message, result.success)
             }
-            InstallResult.SignatureConflict -> {
+            is InstallResult.SignatureConflict -> {
                 UpdateChecker.pendingInstallResult = null
-                showSignatureConflictDialog()
+                showSignatureConflictDialog(result.apkSavedToDownloads, result.apkUrl)
             }
             null -> Unit
         }
@@ -1306,16 +1309,38 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             .show()
     }
 
-    private fun showSignatureConflictDialog() {
+    private fun showSignatureConflictDialog(apkSavedToDownloads: Boolean, apkUrl: String?) {
         resetUpdateBannerButton()
-        AlertDialog.Builder(this)
+        val builder = AlertDialog.Builder(this)
             .setTitle(R.string.update_requires_reinstall)
-            .setMessage(R.string.update_signature_mismatch_message)
-            .setPositiveButton(R.string.update_uninstall) { _, _ ->
-                UpdateChecker.openAppDetailsSettings(this)
-            }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+
+        if (apkSavedToDownloads) {
+            builder
+                .setMessage(R.string.update_signature_mismatch_message)
+                .setPositiveButton(R.string.update_uninstall) { _, _ ->
+                    UpdateChecker.openAppDetailsSettings(this)
+                }
+        } else {
+            builder.setMessage(R.string.update_signature_mismatch_save_failed_message)
+            if (!apkUrl.isNullOrBlank()) {
+                builder.setPositiveButton(R.string.update_download_apk) { _, _ ->
+                    openUpdateApkUrl(apkUrl)
+                }
+            } else {
+                builder.setPositiveButton(android.R.string.ok, null)
+            }
+        }
+
+        builder.show()
+    }
+
+    private fun openUpdateApkUrl(apkUrl: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+        } catch (e: Exception) {
+            Toast.makeText(this, R.string.update_open_download_failed, Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onOverlayVisibilityChanged(visible: Boolean) {

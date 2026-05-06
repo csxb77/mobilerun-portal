@@ -265,7 +265,10 @@
     <string name="update_downloading_percent">Downloading %1$d%%</string>
     <string name="update_requires_reinstall">Reinstall required</string>
     <string name="update_signature_mismatch_message">This update uses a different signing key and cannot install over the current app.\n\nThe new APK has been saved to your Downloads folder. Open app settings, uninstall Mobilerun Portal, then install MobilerunPortal-update.apk from Downloads.</string>
+    <string name="update_signature_mismatch_save_failed_message">This update uses a different signing key and cannot install over the current app.\n\nPortal could not save the new APK to Downloads. Download the update APK first, then uninstall Mobilerun Portal and install the downloaded APK.</string>
     <string name="update_uninstall">Go to App Settings</string>
+    <string name="update_download_apk">Download APK</string>
+    <string name="update_open_download_failed">Could not open the update download.</string>
     <string name="update_check_for_updates">Check for updates</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You’re up to date (v%1$s)</string>

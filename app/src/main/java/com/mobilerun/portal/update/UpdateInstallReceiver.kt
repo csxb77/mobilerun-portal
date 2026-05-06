@@ -25,13 +25,27 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 }
                 if (confirmIntent != null) {
                     confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    AutoAcceptGate.armInstall()
-                    context.startActivity(confirmIntent)
+                    try {
+                        AutoAcceptGate.armInstall()
+                        context.startActivity(confirmIntent)
+                    } catch (e: Exception) {
+                        AutoAcceptGate.disarmInstall()
+                        UpdateChecker.pendingInstallApkUrl = null
+                        broadcastResult(
+                            context,
+                            success = false,
+                            message = "Failed to launch install confirmation: ${e.message}",
+                        )
+                    }
                 } else {
+                    AutoAcceptGate.disarmInstall()
+                    UpdateChecker.pendingInstallApkUrl = null
                     broadcastResult(context, success = false, message = "Install confirmation missing")
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> {
+                AutoAcceptGate.disarmInstall()
+                UpdateChecker.pendingInstallApkUrl = null
                 UpdateChecker.pendingInstallResult =
                     InstallResult.Done(true, "Update installed successfully")
                 broadcastResult(context, success = true, message = "Update installed successfully")
@@ -43,6 +57,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 if (message.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE", ignoreCase = true)) {
                     handleSignatureConflict(context)
                 } else {
+                    AutoAcceptGate.disarmInstall()
+                    UpdateChecker.pendingInstallApkUrl = null
                     val resultMessage = "Update failed: $message"
                     UpdateChecker.pendingInstallResult =
                         InstallResult.Done(false, resultMessage)
@@ -53,12 +69,18 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     }
 
     private fun handleSignatureConflict(context: Context) {
-        UpdateChecker.saveCachedApkToDownloads(context)
-        UpdateChecker.pendingInstallResult = InstallResult.SignatureConflict
+        AutoAcceptGate.disarmInstall()
+        val apkUrl = UpdateChecker.pendingInstallApkUrl
+        val apkSavedToDownloads = UpdateChecker.saveCachedApkToDownloads(context) != null
+        UpdateChecker.pendingInstallResult =
+            InstallResult.SignatureConflict(apkSavedToDownloads, apkUrl)
         context.sendBroadcast(
             Intent(ACTION_SIGNATURE_CONFLICT)
-                .setPackage(context.packageName),
+                .setPackage(context.packageName)
+                .putExtra(EXTRA_APK_SAVED_TO_DOWNLOADS, apkSavedToDownloads)
+                .putExtra(EXTRA_APK_URL, apkUrl),
         )
+        UpdateChecker.pendingInstallApkUrl = null
     }
 
     private fun broadcastResult(context: Context, success: Boolean, message: String) {
@@ -73,6 +95,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_INSTALL_STATUS = "com.mobilerun.portal.action.UPDATE_INSTALL_STATUS"
         const val ACTION_SIGNATURE_CONFLICT = "com.mobilerun.portal.action.UPDATE_SIGNATURE_CONFLICT"
+        const val EXTRA_APK_SAVED_TO_DOWNLOADS = "extra_apk_saved_to_downloads"
+        const val EXTRA_APK_URL = "extra_apk_url"
         private const val TAG = "UpdateInstallReceiver"
     }
 }

@@ -44,7 +44,10 @@ sealed class UpdateCheckResult {
 
 sealed class InstallResult {
     data class Done(val success: Boolean, val message: String) : InstallResult()
-    object SignatureConflict : InstallResult()
+    data class SignatureConflict(
+        val apkSavedToDownloads: Boolean,
+        val apkUrl: String?,
+    ) : InstallResult()
 }
 
 object UpdateChecker {
@@ -62,6 +65,9 @@ object UpdateChecker {
 
     @Volatile
     var pendingInstallResult: InstallResult? = null
+
+    @Volatile
+    var pendingInstallApkUrl: String? = null
 
     private val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
     private val downloadExecutor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -179,7 +185,9 @@ object UpdateChecker {
         onError: (String) -> Unit,
     ) {
         downloadExecutor.execute {
+            pendingInstallApkUrl = updateInfo.apkUrl
             if (!context.packageManager.canRequestPackageInstalls()) {
+                pendingInstallApkUrl = null
                 mainHandler.post { onError("Install permission is not enabled") }
                 return@execute
             }
@@ -193,11 +201,13 @@ object UpdateChecker {
 
                 downloadClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
+                        pendingInstallApkUrl = null
                         mainHandler.post { onError("Download failed: HTTP ${response.code}") }
                         return@execute
                     }
 
                     val body = response.body ?: run {
+                        pendingInstallApkUrl = null
                         mainHandler.post { onError("Empty download response") }
                         return@execute
                     }
@@ -225,6 +235,7 @@ object UpdateChecker {
 
                     if (!matchesSha256(apkFile, updateInfo.sha256)) {
                         apkFile.delete()
+                        pendingInstallApkUrl = null
                         mainHandler.post { onError("Downloaded APK failed checksum verification") }
                         return@execute
                     }
@@ -235,6 +246,7 @@ object UpdateChecker {
             } catch (e: Exception) {
                 Log.e(TAG, "Update download/install failed", e)
                 apkFile.delete()
+                pendingInstallApkUrl = null
                 mainHandler.post { onError("Update failed: ${e.message}") }
             }
         }
