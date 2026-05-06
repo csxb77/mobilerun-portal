@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -240,6 +241,19 @@ object UpdateChecker {
                         return@execute
                     }
 
+                    val archivePackageName = getArchivePackageName(context, apkFile)
+                    if (archivePackageName != EXPECTED_PACKAGE_NAME) {
+                        apkFile.delete()
+                        pendingInstallApkUrl = null
+                        val errorMessage = if (archivePackageName == null) {
+                            "Downloaded APK package could not be verified"
+                        } else {
+                            "Downloaded APK package mismatch: expected $EXPECTED_PACKAGE_NAME, got $archivePackageName"
+                        }
+                        mainHandler.post { onError(errorMessage) }
+                        return@execute
+                    }
+
                     mainHandler.post { onProgress(100) }
                     commitInstallSession(context, apkFile)
                 }
@@ -398,6 +412,19 @@ object UpdateChecker {
             )
             session.commit(pendingIntent.intentSender)
         }
+    }
+
+    private fun getArchivePackageName(context: Context, apkFile: File): String? {
+        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageArchiveInfo(
+                apkFile.absolutePath,
+                PackageManager.PackageInfoFlags.of(0),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+        }
+        return packageInfo?.packageName
     }
 
     private fun isAllowedApkUrl(url: String, allowLocalHttp: Boolean): Boolean {

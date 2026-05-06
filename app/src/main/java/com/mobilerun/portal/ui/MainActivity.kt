@@ -109,11 +109,14 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             val message =
                 intent.getStringExtra(ApiHandler.EXTRA_INSTALL_MESSAGE)
                     ?: "App installed successfully"
+            val isPortalUpdate =
+                intent.getBooleanExtra(UpdateInstallReceiver.EXTRA_IS_PORTAL_UPDATE, false)
             runOnUiThread {
-                resetUpdateBannerButton()
-                if (success) {
-                    pendingUpdateInfo = null
-                    binding.updateBanner.visibility = View.GONE
+                if (isPortalUpdate) {
+                    resetUpdateBannerButton()
+                    if (success) {
+                        hideUpdateBanner()
+                    }
                 }
                 showInstallSnackbar(message, success)
             }

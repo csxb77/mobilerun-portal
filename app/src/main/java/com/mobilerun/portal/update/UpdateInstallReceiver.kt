@@ -87,6 +87,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
         context.sendBroadcast(
             Intent(ApiHandler.ACTION_INSTALL_RESULT)
                 .setPackage(context.packageName)
+                .putExtra(EXTRA_IS_PORTAL_UPDATE, true)
                 .putExtra(ApiHandler.EXTRA_INSTALL_SUCCESS, success)
                 .putExtra(ApiHandler.EXTRA_INSTALL_MESSAGE, message),
         )
@@ -97,6 +98,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
         const val ACTION_SIGNATURE_CONFLICT = "com.mobilerun.portal.action.UPDATE_SIGNATURE_CONFLICT"
         const val EXTRA_APK_SAVED_TO_DOWNLOADS = "extra_apk_saved_to_downloads"
         const val EXTRA_APK_URL = "extra_apk_url"
+        const val EXTRA_IS_PORTAL_UPDATE = "extra_is_portal_update"
         private const val TAG = "UpdateInstallReceiver"
     }
 }
