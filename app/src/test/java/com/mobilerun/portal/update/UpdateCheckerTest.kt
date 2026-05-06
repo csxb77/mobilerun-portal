@@ -39,7 +39,7 @@ class UpdateCheckerTest {
               "version": "1.2.3",
               "versionCode": 123,
               "packageName": "com.mobilerun.portal",
-              "apkUrl": "https://releases.mobilerun.ai/portal/com.mobilerun.portal/com.mobilerun.portal-1.2.3.apk",
+              "apkUrl": "https://github.com/droidrun/mobilerun-portal/releases/download/v1.2.3/com.mobilerun.portal-1.2.3.apk",
               "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
             }
         """.trimIndent()
@@ -85,7 +85,7 @@ class UpdateCheckerTest {
               "version": "1.2.3",
               "versionCode": 123,
               "packageName": "com.mobilerun.portal",
-              "apkUrl": "https://releases.mobilerun.ai/portal/com.mobilerun.portal/com.mobilerun.portal-1.2.3.apk"
+              "apkUrl": "https://github.com/droidrun/mobilerun-portal/releases/download/v1.2.3/com.mobilerun.portal-1.2.3.apk"
             }
         """.trimIndent()
         UpdateChecker.parseFeed(feed, "com.mobilerun.portal")
@@ -117,7 +117,7 @@ class UpdateCheckerTest {
 
     private fun validFeed(
         packageName: String = "com.mobilerun.portal",
-        apkUrl: String = "https://releases.mobilerun.ai/portal/com.mobilerun.portal/com.mobilerun.portal-1.2.3.apk",
+        apkUrl: String = "https://github.com/droidrun/mobilerun-portal/releases/download/v1.2.3/com.mobilerun.portal-1.2.3.apk",
     ): String {
         return """
             {

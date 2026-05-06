@@ -19,7 +19,7 @@ android {
 
         val updateFeedUrl =
             (project.findProperty("updateFeedUrl") as String?)
-                ?: "https://releases.mobilerun.ai/portal/com.mobilerun.portal/latest.json"
+                ?: "https://github.com/droidrun/mobilerun-portal/releases/latest/download/latest.json"
         buildConfigField(
             "String",
             "UPDATE_FEED_URL",

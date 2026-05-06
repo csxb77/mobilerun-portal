@@ -25,11 +25,6 @@ on:
         required: false
         type: string
         default: '[{"environment":"dev"},{"environment":"staging"},{"environment":"prod"}]'
-      public-base-url:
-        description: Public base URL for release feed APK URLs
-        required: false
-        type: string
-        default: https://releases.mobilerun.ai
     secrets:
       R2_ACCESS_KEY_ID:
         required: true
@@ -38,8 +33,6 @@ on:
       R2_ACCOUNT_ID:
         required: true
       R2_BUCKET:
-        required: true
-      PUBLIC_R2_BUCKET:
         required: true
 
 jobs:
@@ -73,48 +66,3 @@ jobs:
 
           aws s3 cp "${SOURCE_FILE}" "s3://${BUCKET}/${DEST}" --endpoint-url "${R2_ENDPOINT}"
           echo "Uploaded ${SOURCE_FILE} to ${BUCKET}/${DEST}"
-
-  publish-update-feed:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ inputs.artifact-name }}
-
-      - name: Publish update feed
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          PUBLIC_R2_BUCKET: ${{ secrets.PUBLIC_R2_BUCKET }}
-        run: |
-          set -euo pipefail
-
-          FILE="${{ inputs.file-prefix }}-${{ inputs.tag }}.apk"
-          SOURCE_FILE="$(find . -maxdepth 1 -name "${FILE}" | head -n1)"
-          BUCKET="${PUBLIC_R2_BUCKET}"
-          FEED_DIR="${{ inputs.r2-destination-prefix }}/${{ inputs.file-prefix }}"
-          FEED_APK_DEST="${FEED_DIR}/${FILE}"
-          APK_URL="${{ inputs.public-base-url }}/${FEED_APK_DEST}"
-
-          [[ -n "${SOURCE_FILE}" ]]
-          SOURCE_FILE="${SOURCE_FILE#./}"
-
-          SHA256="$(sha256sum "${SOURCE_FILE}" | awk '{print $1}')"
-          cat > latest.json <<EOF
-          {
-            "version": "${{ inputs.tag }}",
-            "versionCode": ${{ github.run_number }},
-            "packageName": "${{ inputs.file-prefix }}",
-            "apkUrl": "${APK_URL}",
-            "sha256": "${SHA256}"
-          }
-          EOF
-
-          aws s3 cp "${SOURCE_FILE}" "s3://${BUCKET}/${FEED_APK_DEST}" --endpoint-url "${R2_ENDPOINT}"
-          aws s3 cp latest.json "s3://${BUCKET}/${FEED_DIR}/latest.json" \
-            --endpoint-url "${R2_ENDPOINT}" \
-            --content-type "application/json"
-          echo "Published update feed to ${BUCKET}/${FEED_DIR}/latest.json"
