@@ -1,7 +1,10 @@
 package com.mobilerun.portal.ui.settings
 
 import android.content.ComponentName
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -13,6 +16,9 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.mobilerun.portal.R
+import com.mobilerun.portal.api.ApiHandler
 import com.mobilerun.portal.config.ConfigManager
 import com.mobilerun.portal.databinding.ActivitySettingsBinding
 import com.mobilerun.portal.events.model.EventType
@@ -26,6 +32,11 @@ import com.mobilerun.portal.taskprompt.PortalCloudClient
 import com.mobilerun.portal.triggers.TriggerRepository
 import com.mobilerun.portal.ui.addWhitespaceStrippingWatcher
 import com.mobilerun.portal.ui.triggers.TriggerRulesActivity
+import com.mobilerun.portal.update.InstallResult
+import com.mobilerun.portal.update.UpdateCheckResult
+import com.mobilerun.portal.update.UpdateChecker
+import com.mobilerun.portal.update.UpdateInfo
+import com.mobilerun.portal.update.UpdateInstallReceiver
 import java.text.NumberFormat
 
 class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
@@ -35,6 +46,40 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
     private val portalCloudClient = PortalCloudClient()
     private var suppressSocketServerSwitchCallback = false
     private var suppressWebSocketSwitchCallback = false
+    private var isInstallReceiverRegistered = false
+    private var isSignatureConflictReceiverRegistered = false
+
+    private val installResultReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ApiHandler.ACTION_INSTALL_RESULT) return
+            if (!intent.getBooleanExtra(UpdateInstallReceiver.EXTRA_IS_PORTAL_UPDATE, false)) return
+            val success = intent.getBooleanExtra(ApiHandler.EXTRA_INSTALL_SUCCESS, false)
+            val message = intent.getStringExtra(ApiHandler.EXTRA_INSTALL_MESSAGE).orEmpty()
+            runOnUiThread {
+                resetUpdateButton()
+                android.widget.Toast.makeText(
+                    this@SettingsActivity,
+                    message.ifBlank {
+                        if (success) "Update installed successfully" else "Update failed"
+                    },
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    private val signatureConflictReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != UpdateInstallReceiver.ACTION_SIGNATURE_CONFLICT) return
+            val apkSavedToDownloads =
+                intent.getBooleanExtra(UpdateInstallReceiver.EXTRA_APK_SAVED_TO_DOWNLOADS, false)
+            val apkUrl = intent.getStringExtra(UpdateInstallReceiver.EXTRA_APK_URL)
+            runOnUiThread {
+                resetUpdateButton()
+                showSignatureConflictDialog(apkSavedToDownloads, apkUrl)
+            }
+        }
+    }
 
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -65,6 +110,7 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
         setupPermissions()
         setupAutomation()
         setupEventFilters()
+        setupUpdateSection()
         setupResetButton()
     }
 
@@ -79,6 +125,9 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
         updatePermissionSwitches()
         syncServerSettingsFromConfig()
         refreshCreditsBalance()
+        refreshCurrentVersion()
+        consumePendingUpdateInstallResult()
+        syncUpdateButtonForActiveInstall()
     }
 
     private fun setupCreditsSection() {
@@ -92,12 +141,14 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
         super.onStart()
         configManager.addListener(this)
         syncServerSettingsFromConfig()
+        registerUpdateReceivers()
     }
 
     override fun onStop() {
         super.onStop()
         configManager.removeListener(this)
         persistReverseConnectionInputs()
+        unregisterUpdateReceivers()
     }
 
     private fun setupDevMode() {
@@ -313,6 +364,220 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
     private fun setupAutomation() {
         binding.openTriggersButton.setOnClickListener {
             startActivity(TriggerRulesActivity.createIntent(this))
+        }
+    }
+
+    private fun setupUpdateSection() {
+        refreshCurrentVersion()
+        binding.btnCheckUpdates.setOnClickListener {
+            runLiveUpdateCheck()
+        }
+    }
+
+    private fun refreshCurrentVersion() {
+        val versionName = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "N/A"
+        } catch (e: Exception) {
+            "N/A"
+        }
+        binding.tvCurrentVersion.text = getString(R.string.update_current_version, versionName)
+    }
+
+    private fun runLiveUpdateCheck() {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
+        binding.btnCheckUpdates.isEnabled = false
+        binding.btnCheckUpdates.text = getString(R.string.update_checking)
+        UpdateChecker.checkForUpdate(this) { result ->
+            if (isDestroyed || isFinishing) return@checkForUpdate
+            resetUpdateButton()
+            when (result) {
+                is UpdateCheckResult.Available -> showUpdateAvailableDialog(result.info)
+                UpdateCheckResult.UpToDate -> {
+                    val currentVersion = try {
+                        packageManager.getPackageInfo(packageName, 0).versionName ?: "N/A"
+                    } catch (e: Exception) {
+                        "N/A"
+                    }
+                    android.widget.Toast.makeText(
+                        this,
+                        getString(R.string.update_up_to_date, currentVersion),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+                is UpdateCheckResult.Failed -> android.widget.Toast.makeText(
+                    this,
+                    getString(R.string.update_check_failed, result.message),
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    private fun showUpdateAvailableDialog(info: UpdateInfo) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_available)
+            .setMessage(getString(R.string.update_available_version, info.latestVersion))
+            .setPositiveButton(R.string.update_now) { _, _ -> startUpdate(info) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun startUpdate(info: UpdateInfo) {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
+        if (!packageManager.canRequestPackageInstalls()) {
+            showInstallPermissionDialogForUpdate()
+            return
+        }
+
+        showUpdateInProgressState()
+        UpdateChecker.downloadAndInstall(
+            context = this,
+            updateInfo = info,
+            onProgress = { percent ->
+                if (isDestroyed || isFinishing) return@downloadAndInstall
+                binding.btnCheckUpdates.text =
+                    getString(R.string.update_downloading_percent, percent)
+            },
+            onError = { message ->
+                if (isDestroyed || isFinishing) return@downloadAndInstall
+                resetUpdateButton()
+                android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG)
+                    .show()
+            },
+        )
+    }
+
+    private fun resetUpdateButton() {
+        if (::binding.isInitialized) {
+            if (UpdateChecker.isUpdateInstallInProgress()) {
+                showUpdateInProgressState()
+                return
+            }
+            binding.btnCheckUpdates.isEnabled = true
+            binding.btnCheckUpdates.text = getString(R.string.update_check_for_updates)
+        }
+    }
+
+    private fun syncUpdateButtonForActiveInstall() {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+        }
+    }
+
+    private fun showUpdateInProgressState() {
+        if (!::binding.isInitialized) return
+        binding.btnCheckUpdates.isEnabled = false
+        binding.btnCheckUpdates.text = getString(R.string.update_downloading)
+    }
+
+    private fun consumePendingUpdateInstallResult() {
+        when (val result = UpdateChecker.pendingInstallResult) {
+            is InstallResult.Done -> {
+                UpdateChecker.pendingInstallResult = null
+                resetUpdateButton()
+                android.widget.Toast.makeText(this, result.message, android.widget.Toast.LENGTH_LONG).show()
+            }
+            is InstallResult.SignatureConflict -> {
+                UpdateChecker.pendingInstallResult = null
+                resetUpdateButton()
+                showSignatureConflictDialog(result.apkSavedToDownloads, result.apkUrl)
+            }
+            null -> Unit
+        }
+    }
+
+    private fun showInstallPermissionDialogForUpdate() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_install_permission_title)
+            .setMessage(R.string.update_install_permission_message)
+            .setPositiveButton(R.string.update_open_install_settings) { _, _ ->
+                UpdateChecker.openInstallPermissionSettings(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSignatureConflictDialog(apkSavedToDownloads: Boolean, apkUrl: String?) {
+        if (isDestroyed || isFinishing) return
+        val builder = AlertDialog.Builder(this)
+            .setTitle(R.string.update_requires_reinstall)
+            .setNegativeButton(R.string.cancel, null)
+
+        if (apkSavedToDownloads) {
+            builder
+                .setMessage(R.string.update_signature_mismatch_message)
+                .setPositiveButton(R.string.update_uninstall) { _, _ ->
+                    UpdateChecker.openAppDetailsSettings(this)
+                }
+        } else {
+            builder.setMessage(R.string.update_signature_mismatch_save_failed_message)
+            if (!apkUrl.isNullOrBlank()) {
+                builder.setPositiveButton(R.string.update_download_apk) { _, _ ->
+                    openUpdateApkUrl(apkUrl)
+                }
+            } else {
+                builder.setPositiveButton(android.R.string.ok, null)
+            }
+        }
+
+        builder.show()
+    }
+
+    private fun openUpdateApkUrl(apkUrl: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(
+                this,
+                R.string.update_open_download_failed,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    private fun registerUpdateReceivers() {
+        if (!isInstallReceiverRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                installResultReceiver,
+                IntentFilter(ApiHandler.ACTION_INSTALL_RESULT),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            isInstallReceiverRegistered = true
+        }
+        if (!isSignatureConflictReceiverRegistered) {
+            ContextCompat.registerReceiver(
+                this,
+                signatureConflictReceiver,
+                IntentFilter(UpdateInstallReceiver.ACTION_SIGNATURE_CONFLICT),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            isSignatureConflictReceiverRegistered = true
+        }
+    }
+
+    private fun unregisterUpdateReceivers() {
+        if (isInstallReceiverRegistered) {
+            try {
+                unregisterReceiver(installResultReceiver)
+            } catch (_: Exception) {
+            } finally {
+                isInstallReceiverRegistered = false
+            }
+        }
+        if (isSignatureConflictReceiverRegistered) {
+            try {
+                unregisterReceiver(signatureConflictReceiver)
+            } catch (_: Exception) {
+            } finally {
+                isSignatureConflictReceiverRegistered = false
+            }
         }
     }
 

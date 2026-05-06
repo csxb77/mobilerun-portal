@@ -16,6 +16,15 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         setProperty("archivesBaseName", "$applicationId-$versionName")
+
+        val updateFeedUrl =
+            (project.findProperty("updateFeedUrl") as String?)
+                ?: "https://releases.mobilerun.ai/portal/com.mobilerun.portal/latest.json"
+        buildConfigField(
+            "String",
+            "UPDATE_FEED_URL",
+            "\"${updateFeedUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
     }
 
     buildFeatures {
@@ -23,9 +32,19 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("DROIDRUN_KEYSTORE_PATH") ?: "/dev/null")
+            storePassword = System.getenv("DROIDRUN_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("DROIDRUN_KEYSTORE_KEY_ALIAS")
+            keyPassword = System.getenv("DROIDRUN_KEYSTORE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

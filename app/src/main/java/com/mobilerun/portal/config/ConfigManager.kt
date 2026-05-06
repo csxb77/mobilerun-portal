@@ -154,7 +154,7 @@ class ConfigManager private constructor(private val context: Context) {
 
     // Overlay visibility
     var overlayVisible: Boolean
-        get() = sharedPrefs.getBoolean(KEY_OVERLAY_VISIBLE, true)
+        get() = sharedPrefs.getBoolean(KEY_OVERLAY_VISIBLE, false)
         set(value) {
             sharedPrefs.edit { putBoolean(KEY_OVERLAY_VISIBLE, value) }
         }
@@ -892,7 +892,7 @@ class ConfigManager private constructor(private val context: Context) {
         clearAllCredentials()
         sharedPrefs.edit(commit = true) {
             clear()
-            putBoolean(KEY_OVERLAY_VISIBLE, true)
+            putBoolean(KEY_OVERLAY_VISIBLE, false)
             putInt(KEY_OVERLAY_OFFSET, DEFAULT_OFFSET)
             putBoolean(KEY_AUTO_OFFSET_ENABLED, true)
             putBoolean(KEY_AUTO_OFFSET_CALCULATED, false)
@@ -913,7 +913,7 @@ class ConfigManager private constructor(private val context: Context) {
         }
         // Notify listeners
         listeners.forEach {
-            it.onOverlayVisibilityChanged(true)
+            it.onOverlayVisibilityChanged(false)
             it.onOverlayOffsetChanged(DEFAULT_OFFSET)
             it.onSocketServerEnabledChanged(false)
             it.onSocketServerPortChanged(DEFAULT_SOCKET_PORT)

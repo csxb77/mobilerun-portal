@@ -255,3 +255,7 @@ Every push to the main branch or pull request will trigger the build workflow th
 - Builds the Android app
 - Creates the APK
 - Uploads the APK as an artifact in the GitHub Actions run
+
+Tag releases (`v*`) build a single signed release APK using the
+`DROIDRUN_KEYSTORE_*` GitHub Actions secrets. The published release asset is
+named `com.mobilerun.portal-<version>.apk`.
