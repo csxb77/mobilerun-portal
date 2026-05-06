@@ -1160,7 +1160,19 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
 
     // ConfigManager.ConfigChangeListener implementation
     override fun onOverlayVisibilityChanged(visible: Boolean) {
-        // Already handled in setOverlayVisible method
+        try {
+            mainHandler.post {
+                if (visible) {
+                    overlayManager.showOverlay()
+                    refreshVisibleElements()
+                } else {
+                    overlayManager.hideOverlay()
+                }
+            }
+            Log.d(TAG, "Overlay visibility changed to: $visible")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying overlay visibility change: ${e.message}", e)
+        }
     }
 
     override fun onOverlayOffsetChanged(offset: Int) {
