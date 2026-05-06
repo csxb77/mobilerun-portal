@@ -255,6 +255,25 @@
     <string name="select_keyboard">Select</string>
     <string name="switch_keyboard">Switch</string>
 
+    <!-- App Updates -->
+    <string name="update_section_header">App</string>
+    <string name="update_current_version">Version %1$s</string>
+    <string name="update_available">Update available</string>
+    <string name="update_available_version">Update available (v%1$s)</string>
+    <string name="update_now">Update</string>
+    <string name="update_downloading">Downloading…</string>
+    <string name="update_downloading_percent">Downloading %1$d%%</string>
+    <string name="update_requires_reinstall">Reinstall required</string>
+    <string name="update_signature_mismatch_message">This update uses a different signing key and cannot install over the current app.\n\nThe new APK has been saved to your Downloads folder. Open app settings, uninstall Mobilerun Portal, then install MobilerunPortal-update.apk from Downloads.</string>
+    <string name="update_uninstall">Go to App Settings</string>
+    <string name="update_check_for_updates">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You’re up to date (v%1$s)</string>
+    <string name="update_check_failed">Update check failed: %1$s</string>
+    <string name="update_install_permission_title">Install permission required</string>
+    <string name="update_install_permission_message">Mobilerun Portal needs permission to install APK updates. Enable “Allow from this source,” then return and try again.</string>
+    <string name="update_open_install_settings">Open install settings</string>
+
     <!-- File Access Warning -->
     <string name="file_access_not_granted">All Files Access not granted. File upload/download will not work.</string>
     <string name="file_access_requires_android_11">File upload/download requires Android 11 or newer in this compatibility tier.</string>

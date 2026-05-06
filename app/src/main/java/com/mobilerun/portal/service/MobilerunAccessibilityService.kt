@@ -216,7 +216,6 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        overlayManager.showOverlay()
         instance = this
         TriggerRuntime.initialize(this)
 

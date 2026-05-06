@@ -317,7 +317,7 @@ class ConfigManagerTaskPromptTest {
 
         assertTrue(deviceStore.isEmpty())
         assertTrue(secretsStore.isEmpty())
-        assertTrue(configManager.overlayVisible)
+        assertFalse(configManager.overlayVisible)
         assertEquals(0, configManager.overlayOffset)
         assertFalse(configManager.socketServerEnabled)
         assertEquals(8080, configManager.socketServerPort)

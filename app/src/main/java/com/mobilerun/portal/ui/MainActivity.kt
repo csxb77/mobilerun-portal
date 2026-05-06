@@ -60,6 +60,11 @@ import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import com.mobilerun.portal.R
 import com.mobilerun.portal.api.ApiHandler
+import com.mobilerun.portal.update.InstallResult
+import com.mobilerun.portal.update.UpdateCheckResult
+import com.mobilerun.portal.update.UpdateChecker
+import com.mobilerun.portal.update.UpdateInfo
+import com.mobilerun.portal.update.UpdateInstallReceiver
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import java.text.NumberFormat
@@ -75,7 +80,9 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     private var isEndpointsExpanded = false
 
     private var isProgrammaticUpdate = false
+    private var pendingUpdateInfo: UpdateInfo? = null
     private var isInstallReceiverRegistered = false
+    private var isSignatureConflictReceiverRegistered = false
     private lateinit var taskPromptCardController: TaskPromptCardController
     private val portalCloudClient = PortalCloudClient()
     private lateinit var taskLaunchCoordinator: PortalTaskLaunchCoordinator
@@ -102,7 +109,21 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             val message =
                 intent.getStringExtra(ApiHandler.EXTRA_INSTALL_MESSAGE)
                     ?: "App installed successfully"
-            showInstallSnackbar(message, success)
+            runOnUiThread {
+                resetUpdateBannerButton()
+                if (success) {
+                    pendingUpdateInfo = null
+                    binding.updateBanner.visibility = View.GONE
+                }
+                showInstallSnackbar(message, success)
+            }
+        }
+    }
+
+    private val signatureConflictReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != UpdateInstallReceiver.ACTION_SIGNATURE_CONFLICT) return
+            runOnUiThread { showSignatureConflictDialog() }
         }
     }
 
@@ -166,6 +187,10 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
 
         // Set app version
         setAppVersion()
+
+        binding.btnUpdate.setOnClickListener {
+            pendingUpdateInfo?.let { info -> triggerUpdate(info) }
+        }
 
         // Configure the offset slider and input
         setupOffsetSlider()
@@ -299,6 +324,7 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     override fun onStart() {
         super.onStart()
         registerInstallResultReceiver()
+        registerSignatureConflictReceiver()
         registerTaskPromptStateReceiver()
     }
 
@@ -313,6 +339,8 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
         refreshTaskPromptUi()
         refreshCreditsBalance()
         syncTaskPromptPolling(immediate = true)
+        consumePendingUpdateInstallResult()
+        checkForUpdates()
     }
 
     override fun onStop() {
@@ -321,6 +349,7 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
         stopTaskPromptPolling()
         unregisterTaskPromptStateReceiver()
         unregisterInstallResultReceiver()
+        unregisterSignatureConflictReceiver()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -1170,6 +1199,123 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
         } finally {
             isInstallReceiverRegistered = false
         }
+    }
+
+    private fun registerSignatureConflictReceiver() {
+        if (isSignatureConflictReceiverRegistered) return
+        ContextCompat.registerReceiver(
+            this,
+            signatureConflictReceiver,
+            IntentFilter(UpdateInstallReceiver.ACTION_SIGNATURE_CONFLICT),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        isSignatureConflictReceiverRegistered = true
+    }
+
+    private fun unregisterSignatureConflictReceiver() {
+        if (!isSignatureConflictReceiverRegistered) return
+        try {
+            unregisterReceiver(signatureConflictReceiver)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to unregister update receiver", e)
+        } finally {
+            isSignatureConflictReceiverRegistered = false
+        }
+    }
+
+    private fun checkForUpdates() {
+        UpdateChecker.checkOnStartupIfNeeded(this) { result ->
+            if (isFinishing || isDestroyed) return@checkOnStartupIfNeeded
+            when (result) {
+                is UpdateCheckResult.Available -> showUpdateBanner(result.info)
+                UpdateCheckResult.UpToDate,
+                is UpdateCheckResult.Failed,
+                -> hideUpdateBanner()
+            }
+        }
+    }
+
+    private fun showUpdateBanner(info: UpdateInfo) {
+        pendingUpdateInfo = info
+        binding.updateBannerText.text =
+            getString(R.string.update_available_version, info.latestVersion)
+        resetUpdateBannerButton()
+        binding.updateBanner.visibility = View.VISIBLE
+    }
+
+    private fun hideUpdateBanner() {
+        pendingUpdateInfo = null
+        binding.updateBanner.visibility = View.GONE
+        resetUpdateBannerButton()
+    }
+
+    private fun triggerUpdate(info: UpdateInfo) {
+        if (!packageManager.canRequestPackageInstalls()) {
+            showInstallPermissionDialogForUpdate()
+            return
+        }
+
+        binding.btnUpdate.isEnabled = false
+        binding.btnUpdate.text = getString(R.string.update_downloading)
+        UpdateChecker.downloadAndInstall(
+            context = this,
+            updateInfo = info,
+            onProgress = { percent ->
+                if (isFinishing || isDestroyed) return@downloadAndInstall
+                binding.btnUpdate.text = getString(R.string.update_downloading_percent, percent)
+            },
+            onError = { message ->
+                if (isFinishing || isDestroyed) return@downloadAndInstall
+                resetUpdateBannerButton()
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            },
+        )
+    }
+
+    private fun resetUpdateBannerButton() {
+        if (::binding.isInitialized) {
+            binding.btnUpdate.isEnabled = true
+            binding.btnUpdate.text = getString(R.string.update_now)
+        }
+    }
+
+    private fun consumePendingUpdateInstallResult() {
+        when (val result = UpdateChecker.pendingInstallResult) {
+            is InstallResult.Done -> {
+                UpdateChecker.pendingInstallResult = null
+                resetUpdateBannerButton()
+                if (result.success) hideUpdateBanner()
+                showInstallSnackbar(result.message, result.success)
+            }
+            InstallResult.SignatureConflict -> {
+                UpdateChecker.pendingInstallResult = null
+                showSignatureConflictDialog()
+            }
+            null -> Unit
+        }
+    }
+
+    private fun showInstallPermissionDialogForUpdate() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_install_permission_title)
+            .setMessage(R.string.update_install_permission_message)
+            .setPositiveButton(R.string.update_open_install_settings) { _, _ ->
+                UpdateChecker.openInstallPermissionSettings(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSignatureConflictDialog() {
+        resetUpdateBannerButton()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.update_requires_reinstall)
+            .setMessage(R.string.update_signature_mismatch_message)
+            .setPositiveButton(R.string.update_uninstall) { _, _ ->
+                UpdateChecker.openAppDetailsSettings(this)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     override fun onOverlayVisibilityChanged(visible: Boolean) {
