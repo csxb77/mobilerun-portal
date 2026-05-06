@@ -32,6 +32,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                         AutoAcceptGate.disarmInstall()
                         UpdateChecker.pendingInstallApkUrl = null
                         UpdateChecker.clearActiveInstallState()
+                        UpdateChecker.clearRelaunchAfterUpdate(context)
                         broadcastResult(
                             context,
                             success = false,
@@ -42,6 +43,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     AutoAcceptGate.disarmInstall()
                     UpdateChecker.pendingInstallApkUrl = null
                     UpdateChecker.clearActiveInstallState()
+                    UpdateChecker.clearRelaunchAfterUpdate(context)
                     broadcastResult(context, success = false, message = "Install confirmation missing")
                 }
             }
@@ -52,6 +54,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 UpdateChecker.pendingInstallResult =
                     InstallResult.Done(true, "Update installed successfully")
                 broadcastResult(context, success = true, message = "Update installed successfully")
+                UpdateRelaunchReceiver.launchPortal(context)
             }
             PackageInstaller.STATUS_FAILURE_CONFLICT -> {
                 handleSignatureConflict(context)
@@ -63,6 +66,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     AutoAcceptGate.disarmInstall()
                     UpdateChecker.pendingInstallApkUrl = null
                     UpdateChecker.clearActiveInstallState()
+                    UpdateChecker.clearRelaunchAfterUpdate(context)
                     val resultMessage = "Update failed: $message"
                     UpdateChecker.pendingInstallResult =
                         InstallResult.Done(false, resultMessage)
@@ -79,6 +83,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
         UpdateChecker.pendingInstallResult =
             InstallResult.SignatureConflict(apkSavedToDownloads, apkUrl)
         UpdateChecker.clearActiveInstallState()
+        UpdateChecker.clearRelaunchAfterUpdate(context)
         context.sendBroadcast(
             Intent(ACTION_SIGNATURE_CONFLICT)
                 .setPackage(context.packageName)

@@ -62,7 +62,9 @@ object UpdateChecker {
     private const val KEY_CACHED_PACKAGE_NAME = "cached_package_name"
     private const val KEY_CACHED_APK_URL = "cached_apk_url"
     private const val KEY_CACHED_SHA256 = "cached_sha256"
+    private const val KEY_RELAUNCH_REQUESTED_MS = "relaunch_requested_ms"
     private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
+    private const val RELAUNCH_REQUEST_TTL_MS = 10 * 60 * 1000L
     const val APK_CACHE_FILENAME = "portal-update.apk"
 
     @Volatile
@@ -274,6 +276,7 @@ object UpdateChecker {
                 apkFile.delete()
                 pendingInstallApkUrl = null
                 clearActiveInstallState()
+                clearRelaunchAfterUpdate(context)
                 mainHandler.post { onError("Update failed: ${e.message}") }
             }
         }
@@ -283,6 +286,30 @@ object UpdateChecker {
 
     fun clearActiveInstallState() {
         updateInstallInProgress.set(false)
+    }
+
+    fun requestRelaunchAfterUpdate(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_RELAUNCH_REQUESTED_MS, System.currentTimeMillis())
+            .apply()
+    }
+
+    fun clearRelaunchAfterUpdate(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_RELAUNCH_REQUESTED_MS)
+            .apply()
+    }
+
+    fun consumeRelaunchAfterUpdate(context: Context): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val requestedAt = prefs.getLong(KEY_RELAUNCH_REQUESTED_MS, 0L)
+        if (requestedAt == 0L) return false
+
+        prefs.edit().remove(KEY_RELAUNCH_REQUESTED_MS).apply()
+        val ageMs = System.currentTimeMillis() - requestedAt
+        return ageMs in 0..RELAUNCH_REQUEST_TTL_MS
     }
 
     fun parseFeed(
@@ -429,6 +456,7 @@ object UpdateChecker {
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or
                     android.app.PendingIntent.FLAG_MUTABLE,
             )
+            requestRelaunchAfterUpdate(context)
             session.commit(pendingIntent.intentSender)
         }
     }
