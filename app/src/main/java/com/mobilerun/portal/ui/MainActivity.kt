@@ -1234,6 +1234,10 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     }
 
     private fun checkForUpdates() {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
         UpdateChecker.checkOnStartupIfNeeded(this) { result ->
             if (isFinishing || isDestroyed) return@checkOnStartupIfNeeded
             when (result) {
@@ -1250,7 +1254,11 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
         val message = getString(R.string.update_available_version, info.latestVersion)
         binding.updateBannerText.text = message
         binding.updateBannerTextProduction.text = message
-        resetUpdateBannerButton()
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+        } else {
+            resetUpdateBannerButton()
+        }
         syncUpdateBannerVisibility()
     }
 
@@ -1272,13 +1280,16 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     }
 
     private fun triggerUpdate(info: UpdateInfo) {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
         if (!packageManager.canRequestPackageInstalls()) {
             showInstallPermissionDialogForUpdate()
             return
         }
 
-        setUpdateButtonsEnabled(false)
-        setUpdateButtonsText(getString(R.string.update_downloading))
+        showUpdateInProgressState()
         UpdateChecker.downloadAndInstall(
             context = this,
             updateInfo = info,
@@ -1299,6 +1310,12 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             setUpdateButtonsEnabled(true)
             setUpdateButtonsText(getString(R.string.update_now))
         }
+    }
+
+    private fun showUpdateInProgressState() {
+        if (!::binding.isInitialized) return
+        setUpdateButtonsEnabled(false)
+        setUpdateButtonsText(getString(R.string.update_downloading))
     }
 
     private fun setUpdateButtonsEnabled(enabled: Boolean) {

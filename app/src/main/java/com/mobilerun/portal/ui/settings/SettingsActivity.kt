@@ -52,6 +52,7 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
     private val installResultReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != ApiHandler.ACTION_INSTALL_RESULT) return
+            if (!intent.getBooleanExtra(UpdateInstallReceiver.EXTRA_IS_PORTAL_UPDATE, false)) return
             val success = intent.getBooleanExtra(ApiHandler.EXTRA_INSTALL_SUCCESS, false)
             val message = intent.getStringExtra(ApiHandler.EXTRA_INSTALL_MESSAGE).orEmpty()
             runOnUiThread {
@@ -126,6 +127,7 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
         refreshCreditsBalance()
         refreshCurrentVersion()
         consumePendingUpdateInstallResult()
+        syncUpdateButtonForActiveInstall()
     }
 
     private fun setupCreditsSection() {
@@ -382,6 +384,10 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
     }
 
     private fun runLiveUpdateCheck() {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
         binding.btnCheckUpdates.isEnabled = false
         binding.btnCheckUpdates.text = getString(R.string.update_checking)
         UpdateChecker.checkForUpdate(this) { result ->
@@ -420,13 +426,16 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
     }
 
     private fun startUpdate(info: UpdateInfo) {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+            return
+        }
         if (!packageManager.canRequestPackageInstalls()) {
             showInstallPermissionDialogForUpdate()
             return
         }
 
-        binding.btnCheckUpdates.isEnabled = false
-        binding.btnCheckUpdates.text = getString(R.string.update_downloading)
+        showUpdateInProgressState()
         UpdateChecker.downloadAndInstall(
             context = this,
             updateInfo = info,
@@ -446,9 +455,25 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
 
     private fun resetUpdateButton() {
         if (::binding.isInitialized) {
+            if (UpdateChecker.isUpdateInstallInProgress()) {
+                showUpdateInProgressState()
+                return
+            }
             binding.btnCheckUpdates.isEnabled = true
             binding.btnCheckUpdates.text = getString(R.string.update_check_for_updates)
         }
+    }
+
+    private fun syncUpdateButtonForActiveInstall() {
+        if (UpdateChecker.isUpdateInstallInProgress()) {
+            showUpdateInProgressState()
+        }
+    }
+
+    private fun showUpdateInProgressState() {
+        if (!::binding.isInitialized) return
+        binding.btnCheckUpdates.isEnabled = false
+        binding.btnCheckUpdates.text = getString(R.string.update_downloading)
     }
 
     private fun consumePendingUpdateInstallResult() {

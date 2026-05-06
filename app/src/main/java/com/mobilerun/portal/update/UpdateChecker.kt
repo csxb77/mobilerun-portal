@@ -28,6 +28,7 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class UpdateInfo(
     val latestVersion: String,
@@ -70,6 +71,7 @@ object UpdateChecker {
     @Volatile
     var pendingInstallApkUrl: String? = null
 
+    private val updateInstallInProgress = AtomicBoolean(false)
     private val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
     private val downloadExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val apiClient by lazy {
@@ -186,10 +188,15 @@ object UpdateChecker {
         onProgress: (Int) -> Unit,
         onError: (String) -> Unit,
     ) {
+        if (!updateInstallInProgress.compareAndSet(false, true)) {
+            return
+        }
+
         downloadExecutor.execute {
             pendingInstallApkUrl = updateInfo.apkUrl
             if (!context.packageManager.canRequestPackageInstalls()) {
                 pendingInstallApkUrl = null
+                clearActiveInstallState()
                 mainHandler.post { onError("Install permission is not enabled") }
                 return@execute
             }
@@ -204,12 +211,14 @@ object UpdateChecker {
                 downloadClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         pendingInstallApkUrl = null
+                        clearActiveInstallState()
                         mainHandler.post { onError("Download failed: HTTP ${response.code}") }
                         return@execute
                     }
 
                     val body = response.body ?: run {
                         pendingInstallApkUrl = null
+                        clearActiveInstallState()
                         mainHandler.post { onError("Empty download response") }
                         return@execute
                     }
@@ -238,6 +247,7 @@ object UpdateChecker {
                     if (!matchesSha256(apkFile, updateInfo.sha256)) {
                         apkFile.delete()
                         pendingInstallApkUrl = null
+                        clearActiveInstallState()
                         mainHandler.post { onError("Downloaded APK failed checksum verification") }
                         return@execute
                     }
@@ -246,6 +256,7 @@ object UpdateChecker {
                     if (archivePackageName != EXPECTED_PACKAGE_NAME) {
                         apkFile.delete()
                         pendingInstallApkUrl = null
+                        clearActiveInstallState()
                         val errorMessage = if (archivePackageName == null) {
                             "Downloaded APK package could not be verified"
                         } else {
@@ -262,9 +273,16 @@ object UpdateChecker {
                 Log.e(TAG, "Update download/install failed", e)
                 apkFile.delete()
                 pendingInstallApkUrl = null
+                clearActiveInstallState()
                 mainHandler.post { onError("Update failed: ${e.message}") }
             }
         }
+    }
+
+    fun isUpdateInstallInProgress(): Boolean = updateInstallInProgress.get()
+
+    fun clearActiveInstallState() {
+        updateInstallInProgress.set(false)
     }
 
     fun parseFeed(

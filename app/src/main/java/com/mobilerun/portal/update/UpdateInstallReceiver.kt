@@ -31,6 +31,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                     } catch (e: Exception) {
                         AutoAcceptGate.disarmInstall()
                         UpdateChecker.pendingInstallApkUrl = null
+                        UpdateChecker.clearActiveInstallState()
                         broadcastResult(
                             context,
                             success = false,
@@ -40,12 +41,14 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 } else {
                     AutoAcceptGate.disarmInstall()
                     UpdateChecker.pendingInstallApkUrl = null
+                    UpdateChecker.clearActiveInstallState()
                     broadcastResult(context, success = false, message = "Install confirmation missing")
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> {
                 AutoAcceptGate.disarmInstall()
                 UpdateChecker.pendingInstallApkUrl = null
+                UpdateChecker.clearActiveInstallState()
                 UpdateChecker.pendingInstallResult =
                     InstallResult.Done(true, "Update installed successfully")
                 broadcastResult(context, success = true, message = "Update installed successfully")
@@ -59,6 +62,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 } else {
                     AutoAcceptGate.disarmInstall()
                     UpdateChecker.pendingInstallApkUrl = null
+                    UpdateChecker.clearActiveInstallState()
                     val resultMessage = "Update failed: $message"
                     UpdateChecker.pendingInstallResult =
                         InstallResult.Done(false, resultMessage)
@@ -74,6 +78,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
         val apkSavedToDownloads = UpdateChecker.saveCachedApkToDownloads(context) != null
         UpdateChecker.pendingInstallResult =
             InstallResult.SignatureConflict(apkSavedToDownloads, apkUrl)
+        UpdateChecker.clearActiveInstallState()
         context.sendBroadcast(
             Intent(ACTION_SIGNATURE_CONFLICT)
                 .setPackage(context.packageName)
