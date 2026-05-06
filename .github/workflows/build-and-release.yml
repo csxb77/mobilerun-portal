@@ -139,12 +139,38 @@ jobs:
 
           cp "${RELEASE_APK}" "${ARTIFACT_PREFIX}-${VERSION_NAME}.apk"
 
-      - name: Upload release APK
+      - name: Generate update feed
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+
+          VERSION_NAME="${{ steps.version.outputs.VERSION_NAME }}"
+          VERSION_CODE="${{ steps.version.outputs.VERSION_CODE }}"
+          ARTIFACT_PREFIX="${PORTAL_ARTIFACT_PREFIX}"
+          RELEASE_APK="${ARTIFACT_PREFIX}-${VERSION_NAME}.apk"
+          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION_NAME}/${RELEASE_APK}"
+
+          [[ -f "${RELEASE_APK}" ]]
+
+          SHA256="$(sha256sum "${RELEASE_APK}" | awk '{print $1}')"
+          cat > latest.json <<EOF
+          {
+            "version": "${VERSION_NAME}",
+            "versionCode": ${VERSION_CODE},
+            "packageName": "${ARTIFACT_PREFIX}",
+            "apkUrl": "${APK_URL}",
+            "sha256": "${SHA256}"
+          }
+          EOF
+
+      - name: Upload release files
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: ${{ env.PORTAL_ARTIFACT_PREFIX }}-*.apk
+          path: |
+            ${{ env.PORTAL_ARTIFACT_PREFIX }}-*.apk
+            latest.json
           retention-days: 1
 
       - name: Upload debug APK
@@ -170,7 +196,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/*.apk
+          files: |
+            artifacts/*.apk
+            artifacts/latest.json
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -188,4 +216,3 @@ jobs:
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      PUBLIC_R2_BUCKET: ${{ secrets.PUBLIC_R2_BUCKET }}
