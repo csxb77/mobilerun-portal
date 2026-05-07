@@ -954,6 +954,9 @@ class TriggerRuleEditorActivity : AppCompatActivity() {
             return view
         }
 
+        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+            getView(position, convertView, parent)
+
         private val appFilter = object : Filter() {
             override fun performFiltering(constraint: CharSequence?): FilterResults {
                 val query = constraint?.toString()?.trim()?.lowercase() ?: ""
