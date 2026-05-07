@@ -2,15 +2,12 @@ package com.mobilerun.portal.triggers
 
 import android.Manifest
 import android.app.AlarmManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.mobilerun.portal.events.model.EventType
 import com.mobilerun.portal.service.MobilerunAccessibilityService
-import com.mobilerun.portal.service.MobilerunNotificationListener
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -289,14 +286,8 @@ class TriggerApi(
             )
         }
 
-        private fun isNotificationAccessEnabled(context: Context): Boolean {
-            val componentName = ComponentName(context, MobilerunNotificationListener::class.java)
-            val enabledListeners = Settings.Secure.getString(
-                context.contentResolver,
-                "enabled_notification_listeners",
-            )
-            return enabledListeners?.contains(componentName.flattenToString()) == true
-        }
+        private fun isNotificationAccessEnabled(context: Context): Boolean =
+            TriggerEditorSupport.isNotificationAccessEnabled(context)
 
         private fun hasPermission(context: Context, permission: String): Boolean {
             return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
