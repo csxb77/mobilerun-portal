@@ -230,6 +230,13 @@ class TriggerApi(
         val rule = operations.getRule(ruleId) ?: return TriggerApiResult.Error(
             "Trigger rule not found: $ruleId",
         )
+        if (TriggerEditorSupport.isNotificationSource(rule.source) &&
+            !environmentStatusProvider.get(appContext).notificationAccessEnabled
+        ) {
+            return TriggerApiResult.Error(
+                "Cannot test notification trigger: notification listener access is not granted",
+            )
+        }
         operations.launchTest(ruleId)
         return TriggerApiResult.Success("Test run requested for ${rule.id}")
     }
