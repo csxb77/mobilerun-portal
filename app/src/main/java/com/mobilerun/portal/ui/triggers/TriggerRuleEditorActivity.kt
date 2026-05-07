@@ -783,6 +783,12 @@ class TriggerRuleEditorActivity : AppCompatActivity() {
 
     private fun testRule() {
         val savedRule = saveRule(finishAfterSave = false, showToast = false) ?: return
+        if (TriggerEditorSupport.isNotificationSource(savedRule.source) &&
+            !TriggerEditorSupport.isNotificationAccessEnabled(this)
+        ) {
+            showNotificationAccessWarning()
+            return
+        }
         TriggerRuntime.launchTest(savedRule.id)
         Toast.makeText(this, "Test run requested for ${savedRule.name}", Toast.LENGTH_SHORT).show()
     }
