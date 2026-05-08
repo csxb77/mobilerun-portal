@@ -223,7 +223,7 @@ object PortalTaskTrajectoryUiSupport {
 
             "ResultEvent" -> buildSectionText(
                 "Status" to booleanStatus(dataObject?.opt("success")),
-                "Result" to stringValue(dataObject?.opt("message") ?: dataObject?.opt("reason")),
+                "Result" to (stringValue(dataObject?.opt("message")) ?: stringValue(dataObject?.opt("reason"))),
                 "Steps" to stringValue(dataObject?.opt("steps")),
                 "Structured output" to prettyJsonString(dataObject?.opt("structured_output")),
             )
