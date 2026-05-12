@@ -239,9 +239,16 @@ class ConfigManager private constructor(private val context: Context) {
 
     // Reverse Connection Token (Optional, for authenticating with Host/Cloud)
     var reverseConnectionToken: String
-        get() = secretsPrefs.getString(KEY_REVERSE_CONNECTION_TOKEN, "") ?: ""
+        get() = CloudTokenNormalizer.normalize(
+            secretsPrefs.getString(KEY_REVERSE_CONNECTION_TOKEN, ""),
+        ) ?: ""
         set(value) {
-            secretsPrefs.edit { putString(KEY_REVERSE_CONNECTION_TOKEN, value) }
+            secretsPrefs.edit {
+                putString(
+                    KEY_REVERSE_CONNECTION_TOKEN,
+                    CloudTokenNormalizer.normalize(value).orEmpty(),
+                )
+            }
         }
 
     // Reverse Connection Service Key (Header: X-Remote-Device-Key)

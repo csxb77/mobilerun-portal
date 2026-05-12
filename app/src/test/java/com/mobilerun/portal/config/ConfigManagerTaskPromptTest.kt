@@ -277,6 +277,30 @@ class ConfigManagerTaskPromptTest {
     }
 
     @Test
+    fun reverseConnectionToken_normalizesLiteralNullFromLocalPrefs() {
+        secretsStore["reverse_connection_token"] = "null"
+
+        val token = ConfigManager.getInstance(context).reverseConnectionToken
+
+        assertEquals("", token)
+    }
+
+    @Test
+    fun reverseConnectionToken_setterNormalizesBlankAndLiteralNull() {
+        val configManager = ConfigManager.getInstance(context)
+
+        configManager.reverseConnectionToken = "  null  "
+
+        assertEquals("", configManager.reverseConnectionToken)
+        assertEquals("", secretsStore["reverse_connection_token"])
+
+        configManager.reverseConnectionToken = "  real-token  "
+
+        assertEquals("real-token", configManager.reverseConnectionToken)
+        assertEquals("real-token", secretsStore["reverse_connection_token"])
+    }
+
+    @Test
     fun clearCloudCredentials_preservesLocalApiToken() {
         sharedStore["overlay_visible"] = false
         sharedStore["socket_server_enabled"] = true
