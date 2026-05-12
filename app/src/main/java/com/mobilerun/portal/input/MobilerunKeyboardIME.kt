@@ -2,6 +2,8 @@ package com.mobilerun.portal.input
 
 import com.mobilerun.portal.R
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
@@ -138,6 +140,33 @@ class MobilerunKeyboardIME : InputMethodService() {
      */
     fun hasInputConnection(): Boolean {
         return currentInputConnection != null
+    }
+
+    fun getClipboardText(): String? {
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: return null
+            clipboard.primaryClip
+                ?.takeIf { it.itemCount > 0 }
+                ?.getItemAt(0)
+                ?.coerceToText(this)
+                ?.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to read clipboard", e)
+            null
+        }
+    }
+
+    fun setClipboardText(text: String): Boolean {
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: return false
+            clipboard.setPrimaryClip(ClipData.newPlainText("text", text))
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set clipboard", e)
+            false
+        }
     }
 
     override fun onCreateInputView(): View {

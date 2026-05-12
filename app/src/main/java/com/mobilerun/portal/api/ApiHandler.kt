@@ -3,6 +3,8 @@ package com.mobilerun.portal.api
 import android.accessibilityservice.AccessibilityService
 import android.app.ActivityManager
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
@@ -301,6 +303,41 @@ class ApiHandler(
             ApiResponse.Success("Text cleared via Accessibility")
         } else {
             ApiResponse.Error("Clear failed (IME not active and Accessibility fallback failed)")
+        }
+    }
+
+    fun getClipboard(): ApiResponse {
+        if (!isKeyboardImeActiveAndSelected()) {
+            return ApiResponse.Error("Clipboard read requires Mobilerun Keyboard to be selected")
+        }
+
+        val ime = getKeyboardIME() ?: MobilerunKeyboardIME.getInstance()
+            ?: return ApiResponse.Error("Clipboard read requires Mobilerun Keyboard to be active")
+        val text = ime.getClipboardText()
+            ?: return ApiResponse.Error("Clipboard is empty or access was denied")
+
+        return if (text.isEmpty()) {
+            ApiResponse.Error("Clipboard is empty or access was denied")
+        } else {
+            ApiResponse.Success(text)
+        }
+    }
+
+    fun setClipboard(text: String): ApiResponse {
+        return try {
+            val ime = getKeyboardIME() ?: MobilerunKeyboardIME.getInstance()
+            if (ime != null && ime.setClipboardText(text)) {
+                return ApiResponse.Success("Clipboard set")
+            }
+
+            val clipboard =
+                context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    ?: return ApiResponse.Error("Clipboard service unavailable")
+            clipboard.setPrimaryClip(ClipData.newPlainText("text", text))
+            ApiResponse.Success("Clipboard set")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set clipboard", e)
+            ApiResponse.Error("Failed to set clipboard: ${e.message}")
         }
     }
 
