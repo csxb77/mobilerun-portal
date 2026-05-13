@@ -8,7 +8,9 @@ import android.content.ClipboardManager
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
 import android.content.Intent
+import android.os.Looper
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -326,15 +328,48 @@ class ApiHandler(
                 return ApiResponse.Success("Clipboard set")
             }
 
-            val clipboard =
-                context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    ?: return ApiResponse.Error("Clipboard service unavailable")
-            clipboard.setPrimaryClip(ClipData.newPlainText("text", text))
+            val fallbackSet = runOnMainThreadBlocking {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    ?: return@runOnMainThreadBlocking false
+                clipboard.setPrimaryClip(ClipData.newPlainText("text", text))
+                true
+            } ?: false
+            if (!fallbackSet) return ApiResponse.Error("Clipboard service unavailable")
             ApiResponse.Success("Clipboard set")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set clipboard", e)
             ApiResponse.Error("Failed to set clipboard: ${e.message}")
         }
+    }
+
+    private fun <T> runOnMainThreadBlocking(block: () -> T): T? {
+        if (!shouldUseMainThreadClipboardAccess()) {
+            return block()
+        }
+
+        var result: T? = null
+        var failure: Throwable? = null
+        val latch = CountDownLatch(1)
+        Handler(Looper.getMainLooper()).post {
+            try {
+                result = block()
+            } catch (t: Throwable) {
+                failure = t
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (!latch.await(2, TimeUnit.SECONDS)) {
+            throw IllegalStateException("Timed out waiting for main thread clipboard access")
+        }
+        failure?.let { throw it }
+        return result
+    }
+
+    private fun shouldUseMainThreadClipboardAccess(): Boolean {
+        return Build.VERSION.SDK_INT > 0 &&
+            Build.VERSION.SDK_INT <= Build.VERSION_CODES.O_MR1 &&
+            Looper.myLooper() == null
     }
 
     /**
