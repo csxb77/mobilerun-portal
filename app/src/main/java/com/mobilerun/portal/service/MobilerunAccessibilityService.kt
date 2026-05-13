@@ -57,10 +57,28 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         private const val AUTO_ACCEPT_FAILURE_TOAST_DEBOUNCE_MS = 10_000L
         private const val LOCAL_WS_NOTIFICATION_CHANNEL_ID = "local_ws_connection_channel"
         private const val LOCAL_WS_NOTIFICATION_ID = 2003
+        internal const val VISIBLE_ELEMENTS_STALE_GRACE_MS = 750L
 
         // Periodic update constants
         private const val REFRESH_INTERVAL_MS = 250L // Update every 250ms
         private const val MIN_FRAME_TIME_MS = 16L // Minimum time between frames (roughly 60 FPS)
+
+        internal fun shouldReuseVisibleElementsSnapshot(
+            cachedElementCount: Int,
+            snapshotTimeMs: Long,
+            nowMs: Long,
+            snapshotPackageName: String,
+            currentPackageName: String,
+            snapshotActivityName: String,
+            currentActivityName: String,
+        ): Boolean {
+            val snapshotAgeMs = nowMs - snapshotTimeMs
+            return cachedElementCount > 0 &&
+                    snapshotTimeMs > 0L &&
+                    snapshotAgeMs in 0L..VISIBLE_ELEMENTS_STALE_GRACE_MS &&
+                    snapshotPackageName == currentPackageName &&
+                    snapshotActivityName == currentActivityName
+        }
 
         fun getInstance(): MobilerunAccessibilityService? = instance
 
@@ -169,6 +187,9 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
     private var currentPackageName: String = ""
     private var currentActivityName: String = ""
     private val visibleElements = mutableListOf<ElementNode>()
+    private var visibleElementsSnapshotTimeMs = 0L
+    private var visibleElementsSnapshotPackageName = ""
+    private var visibleElementsSnapshotActivityName = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -381,17 +402,15 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
             if (currentPackageName.isEmpty()) {
                 overlayManager.clearElements()
                 overlayManager.refreshOverlay()
+                clearVisibleElementSnapshot()
                 return
             }
-
-            // Clear previous elements
-            clearElementList()
 
             // Get fresh elements
             val elements = getVisibleElementsInternal()
 
             // Update overlay if visible
-            if (configManager.overlayVisible && elements.isNotEmpty()) {
+            if (configManager.overlayVisible) {
                 overlayManager.clearElements()
 
                 elements.forEach { rootElement ->
@@ -418,7 +437,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         try {
             overlayManager.clearElements()
             overlayManager.refreshOverlay()
-            clearElementList()
+            clearVisibleElementSnapshot()
             Log.d(TAG, "Reset overlay state for package change")
         } catch (e: Exception) {
             Log.e(TAG, "Error resetting overlay state: ${e.message}", e)
@@ -434,6 +453,13 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
             }
         }
         visibleElements.clear()
+    }
+
+    private fun clearVisibleElementSnapshot() {
+        clearElementList()
+        visibleElementsSnapshotTimeMs = 0L
+        visibleElementsSnapshotPackageName = ""
+        visibleElementsSnapshotActivityName = ""
     }
 
     private fun applyConfiguration() {
@@ -593,34 +619,78 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         val elements = mutableListOf<ElementNode>()
         val indexCounter = IndexCounter(1)
 
-        val rootNode = rootInActiveWindow ?: return elements
+        val rootCandidates = collectRootCandidates()
+        if (rootCandidates.isEmpty()) {
+            synchronized(visibleElements) {
+                if (shouldReuseVisibleElementsSnapshot(
+                        cachedElementCount = visibleElements.size,
+                        snapshotTimeMs = visibleElementsSnapshotTimeMs,
+                        nowMs = SystemClock.elapsedRealtime(),
+                        snapshotPackageName = visibleElementsSnapshotPackageName,
+                        currentPackageName = currentPackageName,
+                        snapshotActivityName = visibleElementsSnapshotActivityName,
+                        currentActivityName = currentActivityName,
+                    )
+                ) {
+                    return visibleElements.toMutableList()
+                }
+
+                clearVisibleElementSnapshot()
+                return mutableListOf()
+            }
+        }
+
         try {
-            val rootElement = findAllVisibleElements(rootNode, 0, null, indexCounter)
-            rootElement?.let {
-                collectRootElements(it, elements)
+            for ((rootNode, layer) in rootCandidates) {
+                collectVisibleElements(rootNode, layer, null, elements, indexCounter)
             }
         } finally {
-            rootNode.recycle()
+            rootCandidates.forEach { (node, _) -> node.recycle() }
         }
 
         synchronized(visibleElements) {
-            clearElementList()
+            clearVisibleElementSnapshot()
             visibleElements.addAll(elements)
+            visibleElementsSnapshotTimeMs = SystemClock.elapsedRealtime()
+            visibleElementsSnapshotPackageName = currentPackageName
+            visibleElementsSnapshotActivityName = currentActivityName
         }
 
         return elements
     }
 
-    private fun collectRootElements(element: ElementNode, rootElements: MutableList<ElementNode>) {
-        rootElements.add(element)
+    private fun collectRootCandidates(): List<Pair<AccessibilityNodeInfo, Int>> {
+        rootInActiveWindow?.let { return listOf(it to 0) }
+
+        val windows = windows ?: return emptyList()
+        val out = mutableListOf<Pair<AccessibilityNodeInfo, Int>>()
+        try {
+            windows.sortedByDescending { it.layer }
+                .filter { isUserFacingWindow(it) }
+                .forEach { window ->
+                    val root = window.root
+                    if (root != null) {
+                        out.add(root to window.layer)
+                    }
+                }
+        } finally {
+            windows.forEach { it.recycle() }
+        }
+        return out
     }
 
-    private fun findAllVisibleElements(
+    private fun isUserFacingWindow(window: AccessibilityWindowInfo): Boolean {
+        return window.type == AccessibilityWindowInfo.TYPE_APPLICATION ||
+                window.type == AccessibilityWindowInfo.TYPE_SYSTEM
+    }
+
+    private fun collectVisibleElements(
         node: AccessibilityNodeInfo,
         windowLayer: Int,
         parent: ElementNode?,
+        rootElements: MutableList<ElementNode>,
         indexCounter: IndexCounter
-    ): ElementNode? {
+    ) {
         try {
 
             val rect = Rect()
@@ -644,20 +714,6 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
                     else -> className.substringAfterLast('.')
                 }
 
-                val elementType = if (node.isClickable) {
-                    "Clickable"
-                } else if (node.isCheckable) {
-                    "Checkable"
-                } else if (node.isEditable) {
-                    "Input"
-                } else if (text.isNotEmpty()) {
-                    "Text"
-                } else if (node.isScrollable) {
-                    "Container"
-                } else {
-                    "View"
-                }
-
                 val id = ElementNode.createId(rect, className.substringAfterLast('.'), displayText)
 
                 val nodeCopy = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -679,25 +735,32 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
                 // Assign unique index
                 currentElement.overlayIndex = indexCounter.getNext()
 
-                // Set parent-child relationship
-                parent?.addChild(currentElement)
+                if (parent != null) {
+                    parent.addChild(currentElement)
+                } else {
+                    rootElements.add(currentElement)
+                }
             }
 
             // Recursively process children
+            val childParent = currentElement ?: parent
             for (i in 0 until node.childCount) {
                 val childNode = node.getChild(i) ?: continue
                 try {
-                    findAllVisibleElements(childNode, windowLayer, currentElement, indexCounter)
+                    collectVisibleElements(
+                        childNode,
+                        windowLayer,
+                        childParent,
+                        rootElements,
+                        indexCounter
+                    )
                 } finally {
                     childNode.recycle()
                 }
             }
 
-            return currentElement
-
         } catch (e: Exception) {
-            Log.e(TAG, "Error in findAllVisibleElements: ${e.message}", e)
-            return null
+            Log.e(TAG, "Error in collectVisibleElements: ${e.message}", e)
         }
     }
 
@@ -1399,7 +1462,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         stopWebSocketServer()
         hideLocalWebSocketConnectionNotification()
 
-        clearElementList()
+        clearVisibleElementSnapshot()
         configManager.removeListener(this)
         instance = null
         Log.d(TAG, "Accessibility service destroyed")

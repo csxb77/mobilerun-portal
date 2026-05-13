@@ -1,6 +1,8 @@
 package com.mobilerun.portal.core
 
 import android.graphics.Rect
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.mobilerun.portal.service.MobilerunAccessibilityService
 import com.mobilerun.portal.model.ElementNode
 import com.mobilerun.portal.model.PhoneState
@@ -14,9 +16,28 @@ class StateRepository(private val service: MobilerunAccessibilityService?) {
     fun getVisibleElements(): List<ElementNode> = service?.getVisibleElements() ?: emptyList()
 
     fun getFullTree(filter: Boolean): JSONObject? {
-        val root = service?.rootInActiveWindow ?: return null
-        val bounds = if (filter) service.getScreenBounds() else null
+        val svc = service ?: return null
+        val root = svc.rootInActiveWindow ?: pickFallbackRoot(svc) ?: return null
+        val bounds = if (filter) svc.getScreenBounds() else null
         return AccessibilityTreeBuilder.buildFullAccessibilityTreeJson(root, bounds)
+    }
+
+    private fun pickFallbackRoot(svc: MobilerunAccessibilityService): AccessibilityNodeInfo? {
+        val windows = svc.windows ?: return null
+        return try {
+            windows.sortedByDescending { it.layer }
+                .asSequence()
+                .filter { isUserFacingWindow(it) }
+                .mapNotNull { it.root }
+                .firstOrNull()
+        } finally {
+            windows.forEach { it.recycle() }
+        }
+    }
+
+    private fun isUserFacingWindow(window: AccessibilityWindowInfo): Boolean {
+        return window.type == AccessibilityWindowInfo.TYPE_APPLICATION ||
+                window.type == AccessibilityWindowInfo.TYPE_SYSTEM
     }
 
     fun getPhoneState(): PhoneState =

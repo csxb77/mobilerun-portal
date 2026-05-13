@@ -1,9 +1,81 @@
 package com.mobilerun.portal.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MobilerunAccessibilityServiceTest {
+
+    @Test
+    fun shouldReuseVisibleElementsSnapshot_allowsFreshSameScreenCache() {
+        val result = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 1,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_000L + MobilerunAccessibilityService.VISIBLE_ELEMENTS_STALE_GRACE_MS,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.app",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "MainActivity",
+        )
+
+        assertTrue(result)
+    }
+
+    @Test
+    fun shouldReuseVisibleElementsSnapshot_rejectsExpiredCache() {
+        val result = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 1,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_001L + MobilerunAccessibilityService.VISIBLE_ELEMENTS_STALE_GRACE_MS,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.app",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "MainActivity",
+        )
+
+        assertFalse(result)
+    }
+
+    @Test
+    fun shouldReuseVisibleElementsSnapshot_rejectsPackageOrActivityMismatch() {
+        val packageMismatch = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 1,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_100L,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.other",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "MainActivity",
+        )
+        val activityMismatch = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 1,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_100L,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.app",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "OtherActivity",
+        )
+
+        assertFalse(packageMismatch)
+        assertFalse(activityMismatch)
+    }
+
+    @Test
+    fun shouldReuseVisibleElementsSnapshot_rejectsEmptyCache() {
+        val result = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 0,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_100L,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.app",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "MainActivity",
+        )
+
+        assertFalse(result)
+    }
 
     @Test
     fun testCalculateInputText_Replace() {
