@@ -74,6 +74,23 @@ class ApiHandlerTest {
     }
 
     @Test
+    fun getClipboard_succeedsWithEmptyTextViaSelectedIme() {
+        val stateRepo = mockk<StateRepository>(relaxed = true)
+        val ime = mockk<MobilerunKeyboardIME>()
+        val context = mockk<Context>(relaxed = true)
+        every { context.applicationContext } returns context
+        val handler = createHandler(stateRepo = stateRepo, ime = ime, context = context)
+
+        mockkObject(MobilerunKeyboardIME.Companion)
+        every { MobilerunKeyboardIME.isAvailable() } returns true
+        every { MobilerunKeyboardIME.isSelected(context) } returns true
+        every { ime.getClipboardText() } returns ""
+
+        assertEquals(ApiResponse.Success(""), handler.getClipboard())
+        verify(exactly = 1) { ime.getClipboardText() }
+    }
+
+    @Test
     fun getClipboard_errorsWhenImeIsUnavailable() {
         val context = mockk<Context>(relaxed = true)
         every { context.applicationContext } returns context

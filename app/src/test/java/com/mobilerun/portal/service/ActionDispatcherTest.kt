@@ -113,6 +113,20 @@ class ActionDispatcherTest {
     }
 
     @Test
+    fun dispatch_clipboardSet_routesEmptyTextToApiHandler() {
+        val apiHandler = mockk<ApiHandler>()
+        every { apiHandler.setClipboard("") } returns ApiResponse.Success("Clipboard set")
+
+        val dispatcher = ActionDispatcher(apiHandler)
+
+        assertEquals(
+            ApiResponse.Success("Clipboard set"),
+            dispatcher.dispatch("clipboard/set", JSONObject().put("text", "")),
+        )
+        verify(exactly = 1) { apiHandler.setClipboard("") }
+    }
+
+    @Test
     fun dispatch_clipboardSet_acceptsBase64Text() {
         val apiHandler = mockk<ApiHandler>()
         every { apiHandler.setClipboard("hello") } returns ApiResponse.Success("Clipboard set")

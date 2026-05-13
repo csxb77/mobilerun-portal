@@ -316,11 +316,7 @@ class ApiHandler(
         val text = ime.getClipboardText()
             ?: return ApiResponse.Error("Clipboard is empty or access was denied")
 
-        return if (text.isEmpty()) {
-            ApiResponse.Error("Clipboard is empty or access was denied")
-        } else {
-            ApiResponse.Success(text)
-        }
+        return ApiResponse.Success(text)
     }
 
     fun setClipboard(text: String): ApiResponse {
