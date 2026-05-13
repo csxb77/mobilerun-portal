@@ -25,7 +25,10 @@ class StateRepository(private val service: MobilerunAccessibilityService?) {
     private fun pickFallbackRoot(svc: MobilerunAccessibilityService): AccessibilityNodeInfo? {
         val windows = svc.windows ?: return null
         return try {
-            windows.sortedByDescending { it.layer }
+            windows.sortedWith(
+                compareBy<AccessibilityWindowInfo> { fallbackWindowTypePriority(it) }
+                    .thenByDescending { it.layer }
+            )
                 .asSequence()
                 .filter { isUserFacingWindow(it) }
                 .mapNotNull { it.root }
@@ -38,6 +41,14 @@ class StateRepository(private val service: MobilerunAccessibilityService?) {
     private fun isUserFacingWindow(window: AccessibilityWindowInfo): Boolean {
         return window.type == AccessibilityWindowInfo.TYPE_APPLICATION ||
                 window.type == AccessibilityWindowInfo.TYPE_SYSTEM
+    }
+
+    private fun fallbackWindowTypePriority(window: AccessibilityWindowInfo): Int {
+        return when (window.type) {
+            AccessibilityWindowInfo.TYPE_APPLICATION -> 0
+            AccessibilityWindowInfo.TYPE_SYSTEM -> 1
+            else -> 2
+        }
     }
 
     fun getPhoneState(): PhoneState =

@@ -665,7 +665,10 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         val windows = windows ?: return emptyList()
         val out = mutableListOf<Pair<AccessibilityNodeInfo, Int>>()
         try {
-            windows.sortedByDescending { it.layer }
+            windows.sortedWith(
+                compareBy<AccessibilityWindowInfo> { fallbackWindowTypePriority(it) }
+                    .thenByDescending { it.layer }
+            )
                 .filter { isUserFacingWindow(it) }
                 .forEach { window ->
                     val root = window.root
@@ -682,6 +685,14 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
     private fun isUserFacingWindow(window: AccessibilityWindowInfo): Boolean {
         return window.type == AccessibilityWindowInfo.TYPE_APPLICATION ||
                 window.type == AccessibilityWindowInfo.TYPE_SYSTEM
+    }
+
+    private fun fallbackWindowTypePriority(window: AccessibilityWindowInfo): Int {
+        return when (window.type) {
+            AccessibilityWindowInfo.TYPE_APPLICATION -> 0
+            AccessibilityWindowInfo.TYPE_SYSTEM -> 1
+            else -> 2
+        }
     }
 
     private fun collectVisibleElements(

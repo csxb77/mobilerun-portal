@@ -68,4 +68,69 @@ class StateRepositoryHeadlessTest {
             unmockkObject(AccessibilityTreeBuilder)
         }
     }
+
+    @Test
+    fun fullTreeFallbackPrefersApplicationRootOverHigherLayerSystemRoot() {
+        val service = mockk<MobilerunAccessibilityService>()
+        val systemWindow = mockk<AccessibilityWindowInfo>()
+        val appWindow = mockk<AccessibilityWindowInfo>()
+        val systemRoot = mockk<AccessibilityNodeInfo>()
+        val appRoot = mockk<AccessibilityNodeInfo>()
+        val expected = JSONObject().put("app", true)
+
+        every { service.rootInActiveWindow } returns null
+        every { service.windows } returns listOf(systemWindow, appWindow)
+        every { service.getScreenBounds() } returns Rect(0, 0, 100, 100)
+        every { systemWindow.layer } returns 10
+        every { systemWindow.type } returns AccessibilityWindowInfo.TYPE_SYSTEM
+        every { systemWindow.root } returns systemRoot
+        every { systemWindow.recycle() } just runs
+        every { appWindow.layer } returns 1
+        every { appWindow.type } returns AccessibilityWindowInfo.TYPE_APPLICATION
+        every { appWindow.root } returns appRoot
+        every { appWindow.recycle() } just runs
+
+        mockkObject(AccessibilityTreeBuilder)
+        try {
+            every {
+                AccessibilityTreeBuilder.buildFullAccessibilityTreeJson(appRoot, any())
+            } returns expected
+
+            assertSame(expected, StateRepository(service).getFullTree(filter = true))
+
+            verify { appWindow.root }
+            verify(exactly = 0) { systemWindow.root }
+        } finally {
+            unmockkObject(AccessibilityTreeBuilder)
+        }
+    }
+
+    @Test
+    fun fullTreeFallbackUsesSystemRootWhenNoApplicationRootExists() {
+        val service = mockk<MobilerunAccessibilityService>()
+        val systemWindow = mockk<AccessibilityWindowInfo>()
+        val systemRoot = mockk<AccessibilityNodeInfo>()
+        val expected = JSONObject().put("system", true)
+
+        every { service.rootInActiveWindow } returns null
+        every { service.windows } returns listOf(systemWindow)
+        every { service.getScreenBounds() } returns Rect(0, 0, 100, 100)
+        every { systemWindow.layer } returns 1
+        every { systemWindow.type } returns AccessibilityWindowInfo.TYPE_SYSTEM
+        every { systemWindow.root } returns systemRoot
+        every { systemWindow.recycle() } just runs
+
+        mockkObject(AccessibilityTreeBuilder)
+        try {
+            every {
+                AccessibilityTreeBuilder.buildFullAccessibilityTreeJson(systemRoot, any())
+            } returns expected
+
+            assertSame(expected, StateRepository(service).getFullTree(filter = true))
+
+            verify { systemWindow.root }
+        } finally {
+            unmockkObject(AccessibilityTreeBuilder)
+        }
+    }
 }
