@@ -29,14 +29,14 @@ object AccessibilityTreeBuilder {
         node: AccessibilityNodeInfo,
         screenBounds: Rect? = null
     ): JSONObject? {
-        return buildFullAccessibilityTreeJson(node, screenBounds, 0, mutableMapOf())
+        return buildFullAccessibilityTreeJson(node, screenBounds, 0, mutableSetOf())
     }
 
     private fun buildFullAccessibilityTreeJson(
         node: AccessibilityNodeInfo,
         screenBounds: Rect?,
         depth: Int,
-        activeNodeKeyCounts: MutableMap<String, Int>
+        activeNodePath: MutableSet<AccessibilityNodeInfo>
     ): JSONObject? {
         val rect = Rect()
         try {
@@ -57,10 +57,10 @@ object AccessibilityTreeBuilder {
             node.recycle()
             return null
         }
-        if (!AccessibilityTraversalGuard.enterActivePath(nodeKey, activeNodeKeyCounts)) {
+        if (!AccessibilityTraversalGuard.enterActivePath(node, activeNodePath)) {
             Log.w(
                 TAG,
-                "Skipping repeated accessibility node while building full tree: $nodeKey",
+                "Skipping cyclic accessibility node while building full tree: $nodeKey",
             )
             node.recycle()
             return null
@@ -104,7 +104,7 @@ object AccessibilityTreeBuilder {
                     child,
                     screenBounds,
                     depth + 1,
-                    activeNodeKeyCounts,
+                    activeNodePath,
                 )
                 if (childJson != null) {
                     childrenArray.put(childJson)
@@ -355,7 +355,7 @@ object AccessibilityTreeBuilder {
             Log.e(TAG, "Unable to build full accessibility tree node $nodeKey: ${e.message}", e)
             return null
         } finally {
-            AccessibilityTraversalGuard.leaveActivePath(nodeKey, activeNodeKeyCounts)
+            AccessibilityTraversalGuard.leaveActivePath(node, activeNodePath)
             node.recycle()
         }
     }

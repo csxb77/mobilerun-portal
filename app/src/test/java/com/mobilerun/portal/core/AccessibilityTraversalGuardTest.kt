@@ -4,6 +4,7 @@ import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,19 +12,39 @@ import org.junit.Test
 class AccessibilityTraversalGuardTest {
 
     @Test
-    fun activePathAllowsBoundedRepeatedKeysAndResetsOnLeave() {
-        val activePath = mutableMapOf<String, Int>()
-        val key = "same-node-key"
+    fun activePathRejectsSameNodeUntilLeave() {
+        val activePath = mutableSetOf<AccessibilityNodeInfo>()
+        val node = node(viewId = "same")
 
-        repeat(AccessibilityTraversalGuard.MAX_ACCESSIBILITY_NODE_REPEATS_IN_PATH) {
-            assertTrue(AccessibilityTraversalGuard.enterActivePath(key, activePath))
-        }
-        assertTrue(!AccessibilityTraversalGuard.enterActivePath(key, activePath))
+        assertTrue(AccessibilityTraversalGuard.enterActivePath(node, activePath))
+        assertFalse(AccessibilityTraversalGuard.enterActivePath(node, activePath))
 
-        repeat(AccessibilityTraversalGuard.MAX_ACCESSIBILITY_NODE_REPEATS_IN_PATH) {
-            AccessibilityTraversalGuard.leaveActivePath(key, activePath)
+        AccessibilityTraversalGuard.leaveActivePath(node, activePath)
+        assertTrue(AccessibilityTraversalGuard.enterActivePath(node, activePath))
+    }
+
+    @Test
+    fun activePathRejectsEqualNodeUntilLeave() {
+        val activePath = mutableSetOf<AccessibilityNodeInfo>()
+        val first = node(viewId = "same-source")
+        val equivalent = node(viewId = "same-source-copy")
+
+        every { first.hashCode() } returns 42
+        every { equivalent.hashCode() } returns 42
+        every { first.equals(any()) } answers {
+            val other = firstArg<Any?>()
+            other === first || other === equivalent
         }
-        assertTrue(AccessibilityTraversalGuard.enterActivePath(key, activePath))
+        every { equivalent.equals(any()) } answers {
+            val other = firstArg<Any?>()
+            other === equivalent || other === first
+        }
+
+        assertTrue(AccessibilityTraversalGuard.enterActivePath(first, activePath))
+        assertFalse(AccessibilityTraversalGuard.enterActivePath(equivalent, activePath))
+
+        AccessibilityTraversalGuard.leaveActivePath(first, activePath)
+        assertTrue(AccessibilityTraversalGuard.enterActivePath(equivalent, activePath))
     }
 
     @Test

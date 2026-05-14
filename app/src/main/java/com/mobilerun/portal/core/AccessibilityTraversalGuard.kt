@@ -6,27 +6,22 @@ import android.view.accessibility.AccessibilityNodeInfo
 
 object AccessibilityTraversalGuard {
     const val MAX_ACCESSIBILITY_TREE_DEPTH = 128
-    const val MAX_ACCESSIBILITY_NODE_REPEATS_IN_PATH = 8
     private const val TEXT_PREFIX_LENGTH = 64
 
     fun isTooDeep(depth: Int): Boolean = depth > MAX_ACCESSIBILITY_TREE_DEPTH
 
-    fun enterActivePath(nodeKey: String, activeNodeKeyCounts: MutableMap<String, Int>): Boolean {
-        val currentCount = activeNodeKeyCounts[nodeKey] ?: 0
-        if (currentCount >= MAX_ACCESSIBILITY_NODE_REPEATS_IN_PATH) {
-            return false
-        }
-        activeNodeKeyCounts[nodeKey] = currentCount + 1
-        return true
+    fun enterActivePath(
+        node: AccessibilityNodeInfo,
+        activeNodePath: MutableSet<AccessibilityNodeInfo>
+    ): Boolean {
+        return activeNodePath.add(node)
     }
 
-    fun leaveActivePath(nodeKey: String, activeNodeKeyCounts: MutableMap<String, Int>) {
-        val currentCount = activeNodeKeyCounts[nodeKey] ?: return
-        if (currentCount <= 1) {
-            activeNodeKeyCounts.remove(nodeKey)
-        } else {
-            activeNodeKeyCounts[nodeKey] = currentCount - 1
-        }
+    fun leaveActivePath(
+        node: AccessibilityNodeInfo,
+        activeNodePath: MutableSet<AccessibilityNodeInfo>
+    ) {
+        activeNodePath.remove(node)
     }
 
     fun createTraversalKey(node: AccessibilityNodeInfo, rect: Rect): String {

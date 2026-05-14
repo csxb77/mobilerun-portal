@@ -725,7 +725,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         rootElements: MutableList<ElementNode>,
         indexCounter: IndexCounter,
         depth: Int = 0,
-        activeNodeKeyCounts: MutableMap<String, Int> = mutableMapOf()
+        activeNodePath: MutableSet<AccessibilityNodeInfo> = mutableSetOf()
     ) {
         try {
 
@@ -742,8 +742,8 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
                 return
             }
 
-            if (!AccessibilityTraversalGuard.enterActivePath(nodeKey, activeNodeKeyCounts)) {
-                Log.w(TAG, "Skipping repeated accessibility node: $nodeKey")
+            if (!AccessibilityTraversalGuard.enterActivePath(node, activeNodePath)) {
+                Log.w(TAG, "Skipping cyclic accessibility node: $nodeKey")
                 return
             }
 
@@ -827,14 +827,14 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
                             rootElements,
                             indexCounter,
                             depth + 1,
-                            activeNodeKeyCounts
+                            activeNodePath
                         )
                     } finally {
                         childNode.recycle()
                     }
                 }
             } finally {
-                AccessibilityTraversalGuard.leaveActivePath(nodeKey, activeNodeKeyCounts)
+                AccessibilityTraversalGuard.leaveActivePath(node, activeNodePath)
             }
 
         } catch (e: Exception) {

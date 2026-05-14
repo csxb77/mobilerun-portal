@@ -62,8 +62,8 @@ class AccessibilityTreeBuilderTest {
     }
 
     @Test
-    fun buildFullAccessibilityTreeJson_preservesBoundedRepeatedDescendantKeys() {
-        val nodes = (0..3).map { node("repeated-$it") }
+    fun buildFullAccessibilityTreeJson_preservesLongRepeatedSyntheticKeyChains() {
+        val nodes = (0..12).map { node("repeated-$it") }
         nodes.forEachIndexed { index, node ->
             configureNode(node, viewId = "same", children = nodes.getOrNull(index + 1)?.let { listOf(it) } ?: emptyList())
         }
@@ -71,7 +71,7 @@ class AccessibilityTreeBuilderTest {
         val json = AccessibilityTreeBuilder.buildFullAccessibilityTreeJson(nodes.first())
 
         assertNotNull(json)
-        assertEquals(3, treeDepth(json!!))
+        assertEquals(12, treeDepth(json!!))
     }
 
     @Test
