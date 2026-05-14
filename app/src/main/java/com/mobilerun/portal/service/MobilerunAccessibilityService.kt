@@ -1556,7 +1556,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         visited: MutableSet<ElementNode>
     ) {
         if (!visited.add(element)) {
-            Log.w(TAG, "Skipping cyclic overlay element: ${element.id}")
+            Log.w(TAG, "Skipping cyclic overlay element: ${element.redactedLogIdentifier()}")
             return
         }
 

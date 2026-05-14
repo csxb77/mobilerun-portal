@@ -65,6 +65,15 @@ data class ElementNode(
         return text.isNotEmpty() && !nodeInfo.isClickable
     }
 
+    fun redactedLogIdentifier(): String {
+        return "class=$className " +
+            "bounds=${rect.left},${rect.top},${rect.right},${rect.bottom} " +
+            "windowLayer=$windowLayer " +
+            "clickableIndex=$clickableIndex " +
+            "overlayIndex=$overlayIndex " +
+            "identity=${System.identityHashCode(this)}"
+    }
+
     // Calculate nesting level (depth in the hierarchy)
     fun calculateNestingLevel(): Int {
         if (nestingLevel > 0) {

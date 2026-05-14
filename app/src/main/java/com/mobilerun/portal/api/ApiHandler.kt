@@ -1276,7 +1276,7 @@ class ApiHandler(
         val visited = Collections.newSetFromMap(IdentityHashMap<com.mobilerun.portal.model.ElementNode, Boolean>())
         fun collect(node: com.mobilerun.portal.model.ElementNode) {
             if (!visited.add(node)) {
-                Log.w(TAG, "Skipping cyclic flattened element: ${node.id}")
+                Log.w(TAG, "Skipping cyclic flattened element: ${node.redactedLogIdentifier()}")
                 return
             }
             all.add(node)

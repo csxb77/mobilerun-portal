@@ -2,8 +2,10 @@ package com.mobilerun.portal.model
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -51,15 +53,63 @@ class ElementNodeTest {
         assertEquals(listOf(child, root), root.getPathFromRoot())
     }
 
-    private fun element(id: String): ElementNode {
+    @Test
+    fun redactedLogIdentifierOmitsElementIdTextAndContentDescription() {
+        val sensitiveMarker = "dro2052-secret"
+        val rect = rect(1, 2, 30, 40)
+        val element = element(
+            id = "generated-$sensitiveMarker",
+            text = "visible $sensitiveMarker text",
+            className = "EditText",
+            rect = rect,
+            windowLayer = 3,
+            contentDescription = "private $sensitiveMarker description",
+        ).apply {
+            clickableIndex = 7
+            overlayIndex = 11
+        }
+
+        val diagnostic = element.redactedLogIdentifier()
+
+        assertTrue(diagnostic.contains("class=EditText"))
+        assertTrue(diagnostic.contains("bounds=1,2,30,40"))
+        assertTrue(diagnostic.contains("windowLayer=3"))
+        assertTrue(diagnostic.contains("clickableIndex=7"))
+        assertTrue(diagnostic.contains("overlayIndex=11"))
+        assertTrue(diagnostic.contains("identity="))
+        assertFalse(diagnostic.contains(sensitiveMarker))
+        assertFalse(diagnostic.contains(element.id))
+        assertFalse(diagnostic.contains(element.text))
+        assertFalse(diagnostic.contains("private"))
+    }
+
+    private fun element(
+        id: String,
+        text: String = id,
+        className: String = "TextView",
+        rect: Rect = Rect(0, 0, 10, 10),
+        windowLayer: Int = 0,
+        contentDescription: String? = null,
+    ): ElementNode {
+        val nodeInfo = mockk<AccessibilityNodeInfo>(relaxed = true)
+        every { nodeInfo.contentDescription } returns contentDescription
         return ElementNode(
-            nodeInfo = mockk<AccessibilityNodeInfo>(relaxed = true),
-            rect = mockk<Rect>(relaxed = true),
-            text = id,
-            className = "TextView",
-            windowLayer = 0,
+            nodeInfo = nodeInfo,
+            rect = rect,
+            text = text,
+            className = className,
+            windowLayer = windowLayer,
             creationTime = 0L,
             id = id,
         )
+    }
+
+    private fun rect(left: Int, top: Int, right: Int, bottom: Int): Rect {
+        return Rect().apply {
+            this.left = left
+            this.top = top
+            this.right = right
+            this.bottom = bottom
+        }
     }
 }
