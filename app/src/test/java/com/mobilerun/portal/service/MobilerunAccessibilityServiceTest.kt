@@ -1,11 +1,47 @@
 package com.mobilerun.portal.service
 
+import android.graphics.Rect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MobilerunAccessibilityServiceTest {
+
+    @Test
+    fun updateScreenBounds_overwritesStalePortraitBoundsAfterLandscapeRotation() {
+        val bounds = rect(1080, 2400)
+
+        val changed = MobilerunAccessibilityService.updateScreenBounds(bounds, 2400, 1080)
+
+        assertTrue(changed)
+        assertEquals(0, bounds.left)
+        assertEquals(0, bounds.top)
+        assertEquals(2400, bounds.right)
+        assertEquals(1080, bounds.bottom)
+    }
+
+    @Test
+    fun updateScreenBounds_reportsUnchangedWhenDimensionsMatch() {
+        val bounds = rect(2400, 1080)
+
+        val changed = MobilerunAccessibilityService.updateScreenBounds(bounds, 2400, 1080)
+
+        assertFalse(changed)
+        assertEquals(0, bounds.left)
+        assertEquals(0, bounds.top)
+        assertEquals(2400, bounds.right)
+        assertEquals(1080, bounds.bottom)
+    }
+
+    private fun rect(width: Int, height: Int): Rect {
+        return Rect().apply {
+            left = 0
+            top = 0
+            right = width
+            bottom = height
+        }
+    }
 
     @Test
     fun shouldReuseVisibleElementsSnapshot_allowsFreshSameScreenCache() {
@@ -17,6 +53,10 @@ class MobilerunAccessibilityServiceTest {
             currentPackageName = "com.example.app",
             snapshotActivityName = "MainActivity",
             currentActivityName = "MainActivity",
+            snapshotScreenWidth = 2400,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 1080,
+            currentScreenHeight = 1080,
         )
 
         assertTrue(result)
@@ -32,6 +72,10 @@ class MobilerunAccessibilityServiceTest {
             currentPackageName = "com.example.app",
             snapshotActivityName = "MainActivity",
             currentActivityName = "MainActivity",
+            snapshotScreenWidth = 2400,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 1080,
+            currentScreenHeight = 1080,
         )
 
         assertFalse(result)
@@ -47,6 +91,10 @@ class MobilerunAccessibilityServiceTest {
             currentPackageName = "com.example.other",
             snapshotActivityName = "MainActivity",
             currentActivityName = "MainActivity",
+            snapshotScreenWidth = 2400,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 1080,
+            currentScreenHeight = 1080,
         )
         val activityMismatch = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
             cachedElementCount = 1,
@@ -56,10 +104,33 @@ class MobilerunAccessibilityServiceTest {
             currentPackageName = "com.example.app",
             snapshotActivityName = "MainActivity",
             currentActivityName = "OtherActivity",
+            snapshotScreenWidth = 2400,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 1080,
+            currentScreenHeight = 1080,
         )
 
         assertFalse(packageMismatch)
         assertFalse(activityMismatch)
+    }
+
+    @Test
+    fun shouldReuseVisibleElementsSnapshot_rejectsScreenBoundsMismatch() {
+        val result = MobilerunAccessibilityService.shouldReuseVisibleElementsSnapshot(
+            cachedElementCount = 1,
+            snapshotTimeMs = 1_000L,
+            nowMs = 1_100L,
+            snapshotPackageName = "com.example.app",
+            currentPackageName = "com.example.app",
+            snapshotActivityName = "MainActivity",
+            currentActivityName = "MainActivity",
+            snapshotScreenWidth = 1080,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 2400,
+            currentScreenHeight = 1080,
+        )
+
+        assertFalse(result)
     }
 
     @Test
@@ -72,6 +143,10 @@ class MobilerunAccessibilityServiceTest {
             currentPackageName = "com.example.app",
             snapshotActivityName = "MainActivity",
             currentActivityName = "MainActivity",
+            snapshotScreenWidth = 2400,
+            currentScreenWidth = 2400,
+            snapshotScreenHeight = 1080,
+            currentScreenHeight = 1080,
         )
 
         assertFalse(result)
