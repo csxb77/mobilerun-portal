@@ -14,6 +14,25 @@ Use this runbook to verify task start flows.
 
 Run cloud-backed task checks only when `<mobilerun-api-key-env>` is available. If the app is already connected, use the existing credentials. If setup is needed, the agent may enter the key through the normal UI with taps and text input. Do not print the key, and record whether auth was preexisting or injected for this run.
 
+Prefer the provider automation path when setup is needed:
+
+```bash
+API_KEY_B64="$(printf '%s' "$MOBILERUN_API_KEY" | base64 | tr -d '\n')"
+PROMPT_B64="$(printf '%s' 'Open Settings and tell me which Android version is installed. Do not change any settings.' | base64 | tr -d '\n')"
+
+adb shell content insert \
+  --uri content://com.mobilerun.portal/cloud/connect \
+  --bind api_key_base64:s:"$API_KEY_B64"
+
+adb shell content query --uri content://com.mobilerun.portal/cloud/status
+
+adb shell content insert \
+  --uri content://com.mobilerun.portal/cloud/tasks/launch \
+  --bind prompt_base64:s:"$PROMPT_B64"
+```
+
+The launch result URI should include `status=success` and `task_id=<id>`. Query `cloud/status` again and confirm the active task entry references the same task id. Keep all command output that might include credentials out of artifacts; only record whether a key was injected, token presence from status, and the redacted task id.
+
 Use a read-only prompt:
 
 ```text
