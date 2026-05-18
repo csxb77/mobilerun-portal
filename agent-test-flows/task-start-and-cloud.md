@@ -17,8 +17,15 @@ Run cloud-backed task checks only when `<mobilerun-api-key-env>` is available. I
 Prefer the provider automation path when setup is needed:
 
 ```bash
-MOBILERUN_API_KEY="$(tr -d '\n' < /tmp/mobilerun_api_key)"
-API_KEY_B64="$(printf '%s' "$MOBILERUN_API_KEY" | base64 | tr -d '\n')"
+MOBILERUN_CLOUD_KEY="${MOBILERUN_API_KEY:-}"
+if [ -z "$MOBILERUN_CLOUD_KEY" ] && [ -s /tmp/mobilerun_api_key ]; then
+  MOBILERUN_CLOUD_KEY="$(tr -d '\n' < /tmp/mobilerun_api_key)"
+fi
+if [ -z "$MOBILERUN_CLOUD_KEY" ]; then
+  echo "Set MOBILERUN_API_KEY or provide /tmp/mobilerun_api_key" >&2
+  exit 1
+fi
+API_KEY_B64="$(printf '%s' "$MOBILERUN_CLOUD_KEY" | base64 | tr -d '\n')"
 PROMPT_B64="$(printf '%s' 'Open Settings and tell me which Android version is installed. Do not change any settings.' | base64 | tr -d '\n')"
 
 adb shell content insert \
@@ -36,7 +43,7 @@ for attempt in $(seq 1 60); do
   fi
   sleep 1
 done
-unset MOBILERUN_API_KEY API_KEY_B64
+unset MOBILERUN_CLOUD_KEY API_KEY_B64
 
 adb shell content insert \
   --uri content://com.mobilerun.portal/cloud/tasks/launch \
