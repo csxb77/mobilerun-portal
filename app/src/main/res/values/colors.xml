@@ -81,12 +81,24 @@
     <color name="background_card">@color/mobilerun_card</color>
     <color name="background_input">@color/mobilerun_input</color>
     <color name="background_code">@color/mobilerun_muted</color>
-    <color name="alert_error_bg">@color/mobilerun_destructive</color>
+    <!--
+        Status / alert recolor pass: the original layouts use loud, saturated
+        backgrounds for alerts. Remapped to subtle muted-tinted backgrounds so
+        the alert cards read as "informational chrome" rather than "alarm." The
+        action button inside each alert keeps the accent colour so the severity
+        is still legible.
+    -->
+    <color name="alert_warning_bg">@color/alert_warning_tint</color>
+    <color name="alert_warning_button">@color/mobilerun_warning_strong</color>
+    <color name="alert_error_bg">@color/alert_error_tint</color>
     <color name="alert_error_button">@color/mobilerun_destructive</color>
-    <color name="alert_warning_bg">@color/chart_4</color>
-    <color name="alert_warning_button">@color/chart_4</color>
-    <color name="status_success">@color/chart_5</color>
+    <color name="status_success">@color/mobilerun_primary</color>
     <color name="status_error">@color/mobilerun_destructive</color>
+
+    <!-- Soft alert tint backgrounds (light mode). values-night/colors.xml overrides for dark. -->
+    <color name="alert_warning_tint">#1FE2A140</color>          <!-- ~12% alpha amber over light bg -->
+    <color name="alert_error_tint">#1FE05050</color>            <!-- ~12% alpha red over light bg -->
+    <color name="mobilerun_warning_strong">@color/chart_4</color>
     <color name="text_gray">@color/mobilerun_muted_foreground</color>
     <color name="text_gray_light">@color/mobilerun_muted_foreground</color>
     <color name="text_gray_dark">@color/mobilerun_muted_foreground</color>

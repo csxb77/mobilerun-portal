@@ -41,4 +41,9 @@
 
     <!-- Ripple highlight: primary @ ~13% alpha (0x22). Uses the DARK primary hex. -->
     <color name="mobilerun_ripple">#2273A0FF</color>
+
+    <!-- Soft alert tint backgrounds (dark mode override). Slightly higher alpha
+         so the tint reads against the darker surface. -->
+    <color name="alert_warning_tint">#33E2A140</color>          <!-- ~20% alpha amber over dark bg -->
+    <color name="alert_error_tint">#33E05050</color>            <!-- ~20% alpha red over dark bg -->
 </resources>
