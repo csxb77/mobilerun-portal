@@ -47,7 +47,7 @@
     <color name="mobilerun_sidebar_foreground">@color/mobilerun_foreground</color>
     <color name="mobilerun_sidebar_border">@color/mobilerun_border</color>
 
-    <!-- Shadow (spec --shadow-color = hsl(30 25% 12%)) -->
+    <!-- Shadow (spec shadow-color = hsl(30 25% 12%)) -->
     <color name="mobilerun_shadow">#27241F</color>
 
     <!-- Ripple highlight: primary @ ~13% alpha (0x22). Drop the # off mobilerun_primary and prepend #22. -->
@@ -76,9 +76,39 @@
     <color name="mobilerun_primary_light">@color/mobilerun_accent</color>
     <color name="mobilerun_divider">@color/mobilerun_border</color>
     <color name="mobilerun_text_secondary">@color/mobilerun_muted_foreground</color>
+    <color name="mobilerun_text_light">@color/mobilerun_foreground</color>
+    <color name="mobilerun_error">@color/mobilerun_destructive</color>
+    <color name="mobilerun_success">@color/chart_5</color>
+    <color name="mobilerun_warning">@color/chart_4</color>
+    <color name="background_primary">@color/mobilerun_background</color>
     <color name="background_card">@color/mobilerun_card</color>
+    <color name="background_input">@color/mobilerun_input</color>
+    <color name="background_code">@color/mobilerun_muted</color>
+    <color name="alert_error_bg">@color/mobilerun_destructive</color>
+    <color name="alert_error_button">@color/mobilerun_destructive</color>
+    <color name="alert_warning_bg">@color/chart_4</color>
+    <color name="alert_warning_button">@color/chart_4</color>
+    <color name="status_success">@color/chart_5</color>
+    <color name="status_error">@color/mobilerun_destructive</color>
     <color name="text_gray">@color/mobilerun_muted_foreground</color>
+    <color name="text_gray_light">@color/mobilerun_muted_foreground</color>
+    <color name="text_gray_dark">@color/mobilerun_muted_foreground</color>
+    <color name="text_hint">@color/mobilerun_muted_foreground</color>
     <color name="text_white">@color/mobilerun_foreground</color>
+    <color name="stroke_gray">@color/mobilerun_border</color>
+    <color name="task_prompt_card_surface">@color/mobilerun_card</color>
+    <color name="task_prompt_input_surface">@color/mobilerun_input</color>
+    <color name="task_prompt_stroke">@color/mobilerun_border</color>
+    <color name="task_prompt_text_primary">@color/mobilerun_foreground</color>
+    <color name="task_prompt_text_secondary">@color/mobilerun_muted_foreground</color>
+    <color name="task_prompt_accent">@color/mobilerun_accent</color>
+    <color name="task_prompt_accent_light">@color/mobilerun_accent</color>
+    <color name="task_prompt_error">@color/mobilerun_destructive</color>
+    <color name="task_prompt_chip_info_bg">@color/mobilerun_muted</color>
+    <color name="task_prompt_chip_success_bg">@color/mobilerun_muted</color>
+    <color name="task_prompt_chip_error_bg">@color/mobilerun_destructive</color>
+    <color name="http_get">@color/mobilerun_primary</color>
+    <color name="http_post">@color/chart_2</color>
 
     <!-- Dashboard task status colors (from upstream 19b44e1; not yet token-mapped) -->
     <color name="task_status_completed">#0D9373</color>
