@@ -54,7 +54,6 @@ import com.mobilerun.portal.ui.taskprompt.TaskPromptCardController
 import com.mobilerun.portal.ui.taskprompt.TaskDetailsActivity
 import com.mobilerun.portal.ui.taskprompt.TaskHistoryActivity
 import com.mobilerun.portal.ui.settings.SettingsActivity
-import androidx.core.graphics.toColorInt
 import androidx.core.content.ContextCompat
 
 import android.content.BroadcastReceiver
@@ -1224,7 +1223,7 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
     private fun showInstallSnackbar(message: String, success: Boolean) {
         val snackbar = Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG)
         if (!success) {
-            snackbar.setBackgroundTint("#D32F2F".toColorInt())
+            snackbar.setBackgroundTint(ContextCompat.getColor(this, R.color.mobilerun_destructive))
         }
         val textView = snackbar.view.findViewById<TextView>(
             com.google.android.material.R.id.snackbar_text
@@ -2287,7 +2286,7 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             if (accessibilityService != null) {
                 val status = accessibilityService.getSocketServerStatus()
                 binding.socketServerStatus.text = status
-                binding.socketServerStatus.setTextColor("#00FFA6".toColorInt())
+                binding.socketServerStatus.setTextColor(ContextCompat.getColor(this, R.color.mobilerun_success))
             } else {
                 binding.socketServerStatus.text = "Service not available"
             }
