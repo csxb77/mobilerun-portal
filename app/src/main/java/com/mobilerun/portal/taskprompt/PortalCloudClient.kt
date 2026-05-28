@@ -704,6 +704,7 @@ class PortalCloudClient(
                                 finishedAt = task.finishedAt,
                                 steps = task.steps,
                                 summary = task.summary,
+                                llmModel = task.llmModel,
                             ),
                         )
                     }

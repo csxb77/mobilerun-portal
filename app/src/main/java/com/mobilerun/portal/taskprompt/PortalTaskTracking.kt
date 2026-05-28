@@ -30,6 +30,7 @@ data class PortalTaskHistoryItem(
     val finishedAt: String? = null,
     val steps: Int? = null,
     val summary: String? = null,
+    val llmModel: String? = null,
 )
 
 data class PortalTaskHistoryPage(

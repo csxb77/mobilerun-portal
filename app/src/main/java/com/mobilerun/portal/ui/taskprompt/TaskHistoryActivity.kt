@@ -29,11 +29,14 @@ import com.mobilerun.portal.taskprompt.PortalTaskHistoryResult
 import com.mobilerun.portal.taskprompt.PortalTaskStatusAppearance
 import com.mobilerun.portal.taskprompt.PortalTaskUiSupport
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.tabs.TabLayout
 import com.google.android.material.textfield.TextInputEditText
+import java.util.Locale
 
 class TaskHistoryActivity : AppCompatActivity() {
     companion object {
         private const val PAGE_SIZE = 20
+        private const val DASHBOARD_PAGE_SIZE = 100
         private const val SEARCH_DEBOUNCE_MS = 300L
 
         fun createIntent(context: Context): Intent {
@@ -49,6 +52,7 @@ class TaskHistoryActivity : AppCompatActivity() {
     private lateinit var footerView: LinearLayout
     private lateinit var adapter: TaskHistoryAdapter
 
+    // History tab views
     private val searchInput: TextInputEditText
         get() = binding.taskHistorySearchInput
     private val listView: ListView
@@ -62,6 +66,39 @@ class TaskHistoryActivity : AppCompatActivity() {
     private val retryButton: MaterialButton
         get() = binding.taskHistoryRetryButton
 
+    // Tab views
+    private val tabLayout: TabLayout
+        get() = binding.taskTabs
+    private val dashboardContainer: View
+        get() = binding.taskDashboardContainer
+    private val historyContainer: View
+        get() = binding.taskHistoryContainer
+    private val dashboardLoading: View
+        get() = binding.taskDashboardLoading
+    private val dashboardError: View
+        get() = binding.taskDashboardError
+    private val dashboardRetryButton: MaterialButton
+        get() = binding.taskDashboardRetryButton
+
+    // Dashboard stat views
+    private val avgDurationValue: TextView
+        get() = binding.dashboardAvgDurationValue
+    private val avgStepsValue: TextView
+        get() = binding.dashboardAvgStepsValue
+    private val topModelValue: TextView
+        get() = binding.dashboardTopModelValue
+    private val sparklineView: SparklineView
+        get() = binding.dashboardSparkline
+    private val successRateValue: TextView
+        get() = binding.dashboardSuccessRateValue
+    private val successRateDetail: TextView
+        get() = binding.dashboardSuccessRateDetail
+    private val totalRunsValue: TextView
+        get() = binding.dashboardTotalRunsValue
+    private val totalRunsDetail: TextView
+        get() = binding.dashboardTotalRunsDetail
+
+    // History state
     private var searchRunnable: Runnable? = null
     private var currentPage = 0
     private var hasNextPage = false
@@ -69,16 +106,190 @@ class TaskHistoryActivity : AppCompatActivity() {
     private var isLoadingMore = false
     private var requestToken = 0
     private var errorMessage: String? = null
+    private var hasLoadedHistory = false
+
+    // Dashboard state
+    private var dashboardRequestToken = 0
+    private var isDashboardLoading = false
+    private var hasLoadedDashboard = false
+    private var dashboardStats: DashboardStats? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityTaskHistoryBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        binding.taskHistoryBackButton.setOnClickListener {
+        binding.taskHistoryBackButton.setOnClickListener { finish() }
+
+        setupTabs()
+        setupHistoryTab()
+        setupDashboardTab()
+
+        if (!hasValidSession(showToast = true)) {
             finish()
+            return
         }
 
+        // Start on Dashboard tab
+        showDashboardTab()
+    }
+
+    override fun onDestroy() {
+        searchRunnable?.let(handler::removeCallbacks)
+        super.onDestroy()
+    }
+
+    // --- Tab Setup ---
+
+    private fun setupTabs() {
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_dashboard))
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_history))
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                when (tab.position) {
+                    0 -> showDashboardTab()
+                    1 -> showHistoryTab()
+                }
+            }
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+            override fun onTabReselected(tab: TabLayout.Tab) {
+                if (tab.position == 0) refreshDashboard()
+            }
+        })
+    }
+
+    private fun showDashboardTab() {
+        searchRunnable?.let(handler::removeCallbacks)
+        historyContainer.visibility = View.GONE
+        if (!hasLoadedDashboard && !isDashboardLoading) {
+            loadDashboard()
+        } else {
+            renderDashboardState()
+        }
+    }
+
+    private fun showHistoryTab() {
+        dashboardContainer.visibility = View.GONE
+        dashboardLoading.visibility = View.GONE
+        dashboardError.visibility = View.GONE
+        historyContainer.visibility = View.VISIBLE
+        if (!hasLoadedHistory && !isInitialLoading) {
+            loadTasks(reset = true)
+        }
+    }
+
+    // --- Dashboard ---
+
+    private fun setupDashboardTab() {
+        dashboardRetryButton.setOnClickListener { loadDashboard() }
+    }
+
+    private fun loadDashboard() {
+        val authToken = currentAuthToken()
+        val restBaseUrl = currentRestBaseUrl()
+        if (authToken.isBlank() || restBaseUrl == null) {
+            hasLoadedDashboard = false
+            dashboardStats = null
+            renderDashboardState()
+            return
+        }
+
+        isDashboardLoading = true
+        renderDashboardState()
+
+        val localToken = ++dashboardRequestToken
+        portalCloudClient.listTasks(
+            restBaseUrl = restBaseUrl,
+            authToken = authToken,
+            query = null,
+            page = 1,
+            pageSize = DASHBOARD_PAGE_SIZE,
+        ) { result ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed || localToken != dashboardRequestToken) {
+                    return@runOnUiThread
+                }
+                isDashboardLoading = false
+                when (result) {
+                    is PortalTaskHistoryResult.Success -> {
+                        hasLoadedDashboard = true
+                        dashboardStats = DashboardStats.compute(
+                            items = result.value.items,
+                            total = result.value.total,
+                        )
+                        renderDashboardState()
+                    }
+                    is PortalTaskHistoryResult.Error -> {
+                        hasLoadedDashboard = false
+                        dashboardStats = null
+                        renderDashboardState()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshDashboard() {
+        if (isDashboardLoading) return
+        hasLoadedDashboard = false
+        loadDashboard()
+    }
+
+    private fun renderDashboardState() {
+        if (tabLayout.selectedTabPosition != 0) return
+
+        if (isDashboardLoading) {
+            dashboardContainer.visibility = View.GONE
+            dashboardLoading.visibility = View.VISIBLE
+            dashboardError.visibility = View.GONE
+            return
+        }
+
+        val stats = dashboardStats
+        if (stats == null) {
+            dashboardContainer.visibility = View.GONE
+            dashboardLoading.visibility = View.GONE
+            dashboardError.visibility = View.VISIBLE
+            return
+        }
+
+        dashboardContainer.visibility = View.VISIBLE
+        dashboardLoading.visibility = View.GONE
+        dashboardError.visibility = View.GONE
+
+        val na = getString(R.string.dashboard_not_available)
+
+        // Performance
+        avgDurationValue.text = stats.avgDurationMs?.let { DashboardStats.formatDuration(it) } ?: na
+        avgStepsValue.text = stats.avgSteps?.toString() ?: na
+        topModelValue.text = stats.topModel?.let { DashboardStats.formatModelLabel(it) } ?: na
+
+        // Sparkline
+        sparklineView.setData(stats.activityByDay.map { it.count })
+
+        // Success Rate
+        if (stats.successRate != null) {
+            successRateValue.text = String.format(Locale.US, "%.1f%%", stats.successRate)
+        } else {
+            successRateValue.text = "—"
+        }
+        successRateDetail.text = getString(
+            R.string.dashboard_done_failed_format,
+            stats.completedCount,
+            stats.failedCount,
+        )
+
+        // Total Runs
+        totalRunsValue.text = String.format(Locale.US, "%,d", stats.totalRuns)
+        totalRunsDetail.text = stats.lastTaskAgoMs?.let { ms ->
+            getString(R.string.dashboard_last_task_format, DashboardStats.formatTimeAgo(ms))
+        } ?: getString(R.string.dashboard_no_tasks_yet)
+    }
+
+    // --- History Tab ---
+
+    private fun setupHistoryTab() {
         footerView = buildFooterView()
         listView.addFooterView(footerView, null, false)
         footerView.visibility = View.GONE
@@ -110,17 +321,6 @@ class TaskHistoryActivity : AppCompatActivity() {
         searchInput.doAfterTextChanged {
             scheduleSearch()
         }
-
-        if (!hasValidSession(showToast = true)) {
-            finish()
-            return
-        }
-        loadTasks(reset = true)
-    }
-
-    override fun onDestroy() {
-        searchRunnable?.let(handler::removeCallbacks)
-        super.onDestroy()
     }
 
     private fun scheduleSearch() {
@@ -170,6 +370,7 @@ class TaskHistoryActivity : AppCompatActivity() {
                 when (result) {
                     is PortalTaskHistoryResult.Success -> {
                         errorMessage = null
+                        hasLoadedHistory = true
                         if (reset) {
                             items.clear()
                         }
@@ -219,6 +420,8 @@ class TaskHistoryActivity : AppCompatActivity() {
         }
     }
 
+    // --- Shared Helpers ---
+
     private fun hasValidSession(showToast: Boolean): Boolean {
         val authToken = currentAuthToken()
         if (authToken.isBlank()) {
@@ -261,6 +464,8 @@ class TaskHistoryActivity : AppCompatActivity() {
             })
         }
     }
+
+    // --- History Adapter ---
 
     private inner class TaskHistoryAdapter : BaseAdapter() {
         private val inflater = LayoutInflater.from(this@TaskHistoryActivity)
