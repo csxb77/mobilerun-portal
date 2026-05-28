@@ -7,10 +7,20 @@ import com.mobilerun.portal.taskprompt.PortalTaskTracking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 data class DayActivity(
     val date: LocalDate,
+    val label: String,
     val count: Int,
+)
+
+data class StatusCount(
+    val status: String,
+    val label: String,
+    val count: Int,
+    val color: Int,
 )
 
 data class DashboardStats(
@@ -18,6 +28,7 @@ data class DashboardStats(
     val completedCount: Int,
     val failedCount: Int,
     val successRate: Double?,
+    val statusCounts: List<StatusCount>,
     val activityByDay: List<DayActivity>,
     val avgDurationMs: Long?,
     val avgSteps: Int?,
@@ -26,6 +37,27 @@ data class DashboardStats(
 ) {
     companion object {
         private const val SPARKLINE_DAYS = 14
+        private val DATE_LABEL_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+
+        private val STATUS_COLORS = mapOf(
+            PortalTaskTracking.STATUS_COMPLETED to 0xFF0D9373.toInt(),
+            PortalTaskTracking.STATUS_FAILED to 0xFFC0392B.toInt(),
+            PortalTaskTracking.STATUS_CANCELLED to 0xFF888888.toInt(),
+            PortalTaskTracking.STATUS_CANCELLING to 0xFFCCA335.toInt(),
+            PortalTaskTracking.STATUS_RUNNING to 0xFFCCA335.toInt(),
+            PortalTaskTracking.STATUS_CREATED to 0xFF4A90D9.toInt(),
+            PortalTaskTracking.STATUS_PAUSED to 0xFFB8A060.toInt(),
+        )
+
+        private val STATUS_LABELS = mapOf(
+            PortalTaskTracking.STATUS_COMPLETED to "Completed",
+            PortalTaskTracking.STATUS_FAILED to "Failed",
+            PortalTaskTracking.STATUS_CANCELLED to "Cancelled",
+            PortalTaskTracking.STATUS_CANCELLING to "Cancelling",
+            PortalTaskTracking.STATUS_RUNNING to "Running",
+            PortalTaskTracking.STATUS_CREATED to "Created",
+            PortalTaskTracking.STATUS_PAUSED to "Paused",
+        )
 
         fun compute(
             items: List<PortalTaskHistoryItem>,
@@ -36,6 +68,18 @@ data class DashboardStats(
             val failed = items.count { it.status == PortalTaskTracking.STATUS_FAILED }
             val finished = completed + failed
             val successRate = if (finished > 0) completed.toDouble() / finished * 100.0 else null
+
+            val countsByStatus = items.groupingBy { it.status }.eachCount()
+            val statusCounts = countsByStatus
+                .map { (status, count) ->
+                    StatusCount(
+                        status = status,
+                        label = STATUS_LABELS[status] ?: status.replaceFirstChar { it.uppercase() },
+                        count = count,
+                        color = STATUS_COLORS[status] ?: 0xFF555555.toInt(),
+                    )
+                }
+                .sortedByDescending { it.count }
 
             val zone = ZoneId.systemDefault()
             val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
@@ -50,7 +94,9 @@ data class DashboardStats(
                     buckets[date] = buckets.getValue(date) + 1
                 }
             }
-            val activityByDay = buckets.map { (date, count) -> DayActivity(date, count) }
+            val activityByDay = buckets.map { (date, count) ->
+                DayActivity(date, date.format(DATE_LABEL_FORMAT), count)
+            }
 
             val durations = items.mapNotNull { item ->
                 val start = PortalTaskTimestampSupport.parseEpochMillis(item.createdAt) ?: return@mapNotNull null
@@ -84,6 +130,7 @@ data class DashboardStats(
                 completedCount = completed,
                 failedCount = failed,
                 successRate = successRate,
+                statusCounts = statusCounts,
                 activityByDay = activityByDay,
                 avgDurationMs = avgDurationMs,
                 avgSteps = avgSteps,

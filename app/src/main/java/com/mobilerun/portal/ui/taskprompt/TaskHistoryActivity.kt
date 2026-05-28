@@ -97,6 +97,10 @@ class TaskHistoryActivity : AppCompatActivity() {
         get() = binding.dashboardTotalRunsValue
     private val totalRunsDetail: TextView
         get() = binding.dashboardTotalRunsDetail
+    private val successRingView: SuccessRingView
+        get() = binding.dashboardSuccessRing
+    private val statusLegend: android.widget.LinearLayout
+        get() = binding.dashboardStatusLegend
 
     // History state
     private var searchRunnable: Runnable? = null
@@ -266,9 +270,51 @@ class TaskHistoryActivity : AppCompatActivity() {
         topModelValue.text = stats.topModel?.let { DashboardStats.formatModelLabel(it) } ?: na
 
         // Sparkline
-        sparklineView.setData(stats.activityByDay.map { it.count })
+        sparklineView.setData(
+            stats.activityByDay.map { it.count },
+            stats.activityByDay.map { it.label },
+        )
 
-        // Success Rate
+        // Success Rate + Ring
+        successRingView.setData(stats.statusCounts.map {
+            StatusSlice(label = it.label, count = it.count, color = it.color)
+        })
+
+        // Status Legend
+        statusLegend.removeAllViews()
+        for (sc in stats.statusCounts) {
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, (3 * resources.displayMetrics.density).toInt(), 0, (3 * resources.displayMetrics.density).toInt())
+            }
+            val dot = View(this).apply {
+                val size = (8 * resources.displayMetrics.density).toInt()
+                layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
+                    marginEnd = (8 * resources.displayMetrics.density).toInt()
+                }
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(sc.color)
+                }
+            }
+            val label = TextView(this).apply {
+                text = sc.label
+                setTextColor(ContextCompat.getColor(this@TaskHistoryActivity, R.color.task_prompt_text_secondary))
+                textSize = 12f
+                layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            val count = TextView(this).apply {
+                text = sc.count.toString()
+                setTextColor(ContextCompat.getColor(this@TaskHistoryActivity, R.color.text_white))
+                textSize = 12f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            row.addView(dot)
+            row.addView(label)
+            row.addView(count)
+            statusLegend.addView(row)
+        }
         if (stats.successRate != null) {
             successRateValue.text = String.format(Locale.US, "%.1f%%", stats.successRate)
         } else {

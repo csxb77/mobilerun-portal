@@ -91,22 +91,47 @@
                         android:orientation="vertical"
                         android:padding="16dp">
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="14dp"
-                            android:text="@string/dashboard_performance"
-                            android:textAllCaps="true"
-                            android:textColor="@color/task_prompt_text_secondary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.08" />
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:layout_marginBottom="14dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/ic_activity"
+                                app:tint="@color/task_prompt_accent"
+                                android:importantForAccessibility="no" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/dashboard_performance"
+                                android:textAllCaps="true"
+                                android:textColor="@color/task_prompt_text_secondary"
+                                android:textSize="11sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.08" />
+
+                        </LinearLayout>
 
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:layout_marginBottom="12dp">
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/ic_clock"
+                                app:tint="@color/task_prompt_text_secondary"
+                                android:importantForAccessibility="no" />
 
                             <TextView
                                 android:layout_width="0dp"
@@ -136,8 +161,17 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:layout_marginBottom="12dp">
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/ic_footprints"
+                                app:tint="@color/task_prompt_text_secondary"
+                                android:importantForAccessibility="no" />
 
                             <TextView
                                 android:layout_width="0dp"
@@ -167,7 +201,16 @@
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
                             android:orientation="horizontal">
+
+                            <ImageView
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/ic_brain"
+                                app:tint="@color/task_prompt_text_secondary"
+                                android:importantForAccessibility="no" />
 
                             <TextView
                                 android:layout_width="0dp"
@@ -215,6 +258,14 @@
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:layout_marginBottom="12dp">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/ic_list_tree"
+                                app:tint="@color/task_prompt_accent"
+                                android:importantForAccessibility="no" />
 
                             <TextView
                                 android:layout_width="0dp"
@@ -265,7 +316,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="6dp"
+                            android:layout_marginBottom="12dp"
                             android:text="@string/dashboard_success_rate"
                             android:textAllCaps="true"
                             android:textColor="@color/task_prompt_text_secondary"
@@ -273,23 +324,53 @@
                             android:textStyle="bold"
                             android:letterSpacing="0.08" />
 
-                        <TextView
-                            android:id="@+id/dashboard_success_rate_value"
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/text_white"
-                            android:textSize="28sp"
-                            android:textStyle="bold"
-                            tools:text="85.0%" />
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/dashboard_success_rate_detail"
-                            android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/dashboard_success_rate_value"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="@color/text_white"
+                                    android:textSize="28sp"
+                                    android:textStyle="bold"
+                                    tools:text="85.0%" />
+
+                                <TextView
+                                    android:id="@+id/dashboard_success_rate_detail"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:textColor="@color/task_prompt_text_secondary"
+                                    android:textSize="12sp"
+                                    tools:text="17 done · 3 failed" />
+
+                            </LinearLayout>
+
+                            <com.mobilerun.portal.ui.taskprompt.SuccessRingView
+                                android:id="@+id/dashboard_success_ring"
+                                android:layout_width="64dp"
+                                android:layout_height="64dp"
+                                android:layout_marginStart="16dp" />
+
+                        </LinearLayout>
+
+                        <!-- Status Legend -->
+                        <LinearLayout
+                            android:id="@+id/dashboard_status_legend"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:textColor="@color/task_prompt_text_secondary"
-                            android:textSize="12sp"
-                            tools:text="17 done · 3 failed" />
+                            android:layout_marginTop="14dp"
+                            android:orientation="vertical" />
 
                     </LinearLayout>
 
