@@ -9,10 +9,12 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.mobilerun.portal.R
 import kotlin.math.abs
 
@@ -96,7 +98,7 @@ class SparklineView @JvmOverloads constructor(
         color = accentColor
         textSize = 11f * resources.displayMetrics.scaledDensity
         textAlign = Paint.Align.CENTER
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        typeface = Typeface.DEFAULT_BOLD
     }
 
     private val linePath = Path()
@@ -106,8 +108,6 @@ class SparklineView @JvmOverloads constructor(
 
     private var cachedXs: FloatArray = FloatArray(0)
     private var cachedYs: FloatArray = FloatArray(0)
-    private var cachedChartTop = 0f
-    private var cachedChartBottom = 0f
     private var cachedGradientTop = -1f
     private var cachedGradientBottom = -1f
 
@@ -125,25 +125,13 @@ class SparklineView @JvmOverloads constructor(
         setMeasuredDimension(w, h)
     }
 
-    private var swipeRefreshParent: androidx.swiperefreshlayout.widget.SwipeRefreshLayout? = null
-
-    private fun findSwipeRefresh(): androidx.swiperefreshlayout.widget.SwipeRefreshLayout? {
-        swipeRefreshParent?.let { return it }
-        var current = parent
-        while (current != null) {
-            if (current is androidx.swiperefreshlayout.widget.SwipeRefreshLayout) {
-                swipeRefreshParent = current
-                return current
-            }
-            current = if (current is View) (current as View).parent else null
-        }
-        return null
-    }
-
     private fun setAllParentsDisallowIntercept(disallow: Boolean) {
         var current = parent
         while (current != null) {
             current.requestDisallowInterceptTouchEvent(disallow)
+            if (current is SwipeRefreshLayout) {
+                current.isEnabled = !disallow
+            }
             current = if (current is View) (current as View).parent else null
         }
     }
@@ -155,7 +143,6 @@ class SparklineView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                 setAllParentsDisallowIntercept(true)
-                findSwipeRefresh()?.isEnabled = false
                 val touchX = event.x
                 var nearest = 0
                 var minDist = Float.MAX_VALUE
@@ -172,9 +159,15 @@ class SparklineView @JvmOverloads constructor(
                 }
                 return true
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP -> {
                 setAllParentsDisallowIntercept(false)
-                findSwipeRefresh()?.isEnabled = true
+                selectedIndex = -1
+                invalidate()
+                performClick()
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                setAllParentsDisallowIntercept(false)
                 selectedIndex = -1
                 invalidate()
                 return true
@@ -198,9 +191,6 @@ class SparklineView @JvmOverloads constructor(
         val chartHeight = chartBottom - chartTop
 
         if (chartWidth <= 0f || chartHeight <= 0f) return
-
-        cachedChartTop = chartTop
-        cachedChartBottom = chartBottom
 
         val maxCount = counts.max().coerceAtLeast(1)
         val stepX = if (count > 1) chartWidth / (count - 1) else chartWidth
@@ -302,8 +292,8 @@ class SparklineView @JvmOverloads constructor(
         if (tooltipX < paddingLeft) tooltipX = paddingLeft.toFloat()
         if (tooltipX + tooltipW > width - paddingRight) tooltipX = width - paddingRight - tooltipW
 
-        val tooltipY = chartTop - tooltipH - tooltipPadding
-        tooltipRect.set(tooltipX, tooltipY.coerceAtLeast(0f), tooltipX + tooltipW, tooltipY + tooltipH)
+        val tooltipTop = (chartTop - tooltipH - tooltipPadding).coerceAtLeast(0f)
+        tooltipRect.set(tooltipX, tooltipTop, tooltipX + tooltipW, tooltipTop + tooltipH)
 
         tooltipBgPaint.color = cardColor
         canvas.drawRoundRect(tooltipRect, cornerRadius, cornerRadius, tooltipBgPaint)

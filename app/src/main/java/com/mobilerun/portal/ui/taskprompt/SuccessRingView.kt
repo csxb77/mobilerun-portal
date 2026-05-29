@@ -6,12 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-
-data class StatusSlice(
-    val label: String,
-    val count: Int,
-    val color: Int,
-)
+import com.mobilerun.portal.taskprompt.PortalStatusCount
 
 class SuccessRingView @JvmOverloads constructor(
     context: Context,
@@ -19,31 +14,28 @@ class SuccessRingView @JvmOverloads constructor(
     defStyleAttr: Int = 0,
 ) : View(context, attrs, defStyleAttr) {
 
-    private var slices: List<StatusSlice> = emptyList()
+    private var slices: List<PortalStatusCount> = emptyList()
     private var total: Int = 0
-
-    private val slicePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    private val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        color = 0xFF2A2A2A.toInt()
-        strokeCap = Paint.Cap.ROUND
-    }
 
     private val oval = RectF()
     private val density = resources.displayMetrics.density
     private val strokeWidth = 8f * density
     private val gapDegrees = 3f
 
-    init {
-        slicePaint.strokeWidth = strokeWidth
-        emptyPaint.strokeWidth = strokeWidth
+    private val slicePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = this@SuccessRingView.strokeWidth
     }
 
-    fun setData(slices: List<StatusSlice>) {
+    private val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0xFF2A2A2A.toInt()
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = this@SuccessRingView.strokeWidth
+    }
+
+    fun setData(slices: List<PortalStatusCount>) {
         this.slices = slices.filter { it.count > 0 }.sortedByDescending { it.count }
         this.total = this.slices.sumOf { it.count }
         invalidate()

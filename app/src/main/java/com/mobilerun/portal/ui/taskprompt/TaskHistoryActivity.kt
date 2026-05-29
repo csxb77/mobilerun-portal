@@ -2,10 +2,12 @@ package com.mobilerun.portal.ui.taskprompt
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -19,12 +21,15 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.mobilerun.portal.R
 import com.mobilerun.portal.config.ConfigManager
 import com.mobilerun.portal.databinding.ActivityTaskHistoryBinding
 import com.mobilerun.portal.databinding.ItemTaskHistoryBinding
 import com.mobilerun.portal.taskprompt.PortalCloudClient
+import com.mobilerun.portal.taskprompt.PortalDashboardStats
 import com.mobilerun.portal.taskprompt.PortalTaskHistoryItem
+import com.mobilerun.portal.taskprompt.PortalTaskHistoryPage
 import com.mobilerun.portal.taskprompt.PortalTaskHistoryResult
 import com.mobilerun.portal.taskprompt.PortalTaskStatusAppearance
 import com.mobilerun.portal.taskprompt.PortalTaskUiSupport
@@ -52,7 +57,8 @@ class TaskHistoryActivity : AppCompatActivity() {
     private lateinit var footerView: LinearLayout
     private lateinit var adapter: TaskHistoryAdapter
 
-    // History tab views
+    private val historySwipeRefresh: SwipeRefreshLayout
+        get() = binding.taskHistorySwipeRefresh
     private val searchInput: TextInputEditText
         get() = binding.taskHistorySearchInput
     private val listView: ListView
@@ -66,13 +72,10 @@ class TaskHistoryActivity : AppCompatActivity() {
     private val retryButton: MaterialButton
         get() = binding.taskHistoryRetryButton
 
-    // Tab views
     private val tabLayout: TabLayout
         get() = binding.taskTabs
-    private val dashboardSwipeRefresh: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    private val dashboardSwipeRefresh: SwipeRefreshLayout
         get() = binding.taskDashboardSwipeRefresh
-    private val dashboardContainer: View
-        get() = binding.taskDashboardContainer
     private val historyContainer: View
         get() = binding.taskHistoryContainer
     private val dashboardLoading: View
@@ -82,7 +85,6 @@ class TaskHistoryActivity : AppCompatActivity() {
     private val dashboardRetryButton: MaterialButton
         get() = binding.taskDashboardRetryButton
 
-    // Dashboard stat views
     private val avgDurationValue: TextView
         get() = binding.dashboardAvgDurationValue
     private val avgStepsValue: TextView
@@ -101,10 +103,13 @@ class TaskHistoryActivity : AppCompatActivity() {
         get() = binding.dashboardTotalRunsDetail
     private val successRingView: SuccessRingView
         get() = binding.dashboardSuccessRing
-    private val statusLegend: android.widget.LinearLayout
+    private val statusLegend: LinearLayout
         get() = binding.dashboardStatusLegend
+    private val performanceSampleHint: TextView
+        get() = binding.dashboardPerformanceSampleHint
+    private val successRateSampleHint: TextView
+        get() = binding.dashboardSuccessRateSampleHint
 
-    // History state
     private var searchRunnable: Runnable? = null
     private var currentPage = 0
     private var hasNextPage = false
@@ -114,11 +119,11 @@ class TaskHistoryActivity : AppCompatActivity() {
     private var errorMessage: String? = null
     private var hasLoadedHistory = false
 
-    // Dashboard state
     private var dashboardRequestToken = 0
     private var isDashboardLoading = false
     private var hasLoadedDashboard = false
-    private var dashboardStats: DashboardStats? = null
+    private var dashboardStats: PortalDashboardStats? = null
+    private var cachedDashboardPage: PortalTaskHistoryPage? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -145,8 +150,6 @@ class TaskHistoryActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // --- Tab Setup ---
-
     private fun setupTabs() {
         tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_dashboard))
         tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_history))
@@ -159,9 +162,8 @@ class TaskHistoryActivity : AppCompatActivity() {
                 }
             }
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
-            override fun onTabReselected(tab: TabLayout.Tab) {
-                if (tab.position == 0) refreshDashboard()
-            }
+
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
         })
     }
 
@@ -181,11 +183,26 @@ class TaskHistoryActivity : AppCompatActivity() {
         dashboardError.visibility = View.GONE
         historyContainer.visibility = View.VISIBLE
         if (!hasLoadedHistory && !isInitialLoading) {
+            if (seedHistoryFromDashboard()) return
             loadTasks(reset = true)
         }
     }
 
-    // --- Dashboard ---
+    private fun seedHistoryFromDashboard(): Boolean {
+        val cached = cachedDashboardPage ?: return false
+        val query = searchInput.text?.toString()?.trim().orEmpty()
+        if (query.isNotBlank()) return false
+
+        items.clear()
+        items.addAll(cached.items)
+        currentPage = (cached.items.size + PAGE_SIZE - 1) / PAGE_SIZE
+        hasNextPage = cached.total > cached.items.size
+        hasLoadedHistory = true
+        errorMessage = null
+        adapter.notifyDataSetChanged()
+        renderState()
+        return true
+    }
 
     private fun setupDashboardTab() {
         dashboardRetryButton.setOnClickListener { loadDashboard() }
@@ -195,7 +212,7 @@ class TaskHistoryActivity : AppCompatActivity() {
         dashboardSwipeRefresh.setProgressBackgroundColorSchemeColor(
             ContextCompat.getColor(this, R.color.background_card),
         )
-        dashboardSwipeRefresh.setOnRefreshListener { refreshDashboard() }
+        dashboardSwipeRefresh.setOnRefreshListener { refreshAll() }
     }
 
     private fun loadDashboard() {
@@ -219,33 +236,43 @@ class TaskHistoryActivity : AppCompatActivity() {
             page = 1,
             pageSize = DASHBOARD_PAGE_SIZE,
         ) { result ->
+            val stats = when (result) {
+                is PortalTaskHistoryResult.Success -> PortalDashboardStats.compute(
+                    items = result.value.items,
+                    total = result.value.total,
+                )
+                is PortalTaskHistoryResult.Error -> null
+            }
+            val dashboardItems = when (result) {
+                is PortalTaskHistoryResult.Success -> result.value
+                is PortalTaskHistoryResult.Error -> null
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed || localToken != dashboardRequestToken) {
                     return@runOnUiThread
                 }
                 isDashboardLoading = false
-                when (result) {
-                    is PortalTaskHistoryResult.Success -> {
-                        hasLoadedDashboard = true
-                        dashboardStats = DashboardStats.compute(
-                            items = result.value.items,
-                            total = result.value.total,
-                        )
-                        renderDashboardState()
-                    }
-                    is PortalTaskHistoryResult.Error -> {
-                        hasLoadedDashboard = false
-                        dashboardStats = null
-                        renderDashboardState()
-                    }
+                if (stats != null) {
+                    hasLoadedDashboard = true
+                    dashboardStats = stats
+                    cachedDashboardPage = dashboardItems
+                } else {
+                    hasLoadedDashboard = false
+                    dashboardStats = null
+                    cachedDashboardPage = null
                 }
+                renderDashboardState()
             }
         }
     }
 
-    private fun refreshDashboard() {
+    private fun refreshAll() {
         if (isDashboardLoading) return
         hasLoadedDashboard = false
+        hasLoadedHistory = false
+        cachedDashboardPage = null
+        items.clear()
+        adapter.notifyDataSetChanged()
         loadDashboard()
     }
 
@@ -264,6 +291,7 @@ class TaskHistoryActivity : AppCompatActivity() {
         }
 
         dashboardSwipeRefresh.isRefreshing = false
+        historySwipeRefresh.isRefreshing = false
 
         val stats = dashboardStats
         if (stats == null) {
@@ -280,9 +308,13 @@ class TaskHistoryActivity : AppCompatActivity() {
         val na = getString(R.string.dashboard_not_available)
 
         // Performance
-        avgDurationValue.text = stats.avgDurationMs?.let { DashboardStats.formatDuration(it) } ?: na
+        avgDurationValue.text = stats.avgDurationMs?.let { PortalTaskUiSupport.formatDuration(it) } ?: na
         avgStepsValue.text = stats.avgSteps?.toString() ?: na
-        topModelValue.text = stats.topModel?.let { DashboardStats.formatModelLabel(it) } ?: na
+        topModelValue.text = stats.topModel?.let { PortalCloudClient.formatModelLabel(it) } ?: na
+        val sampleHint = if (stats.sampleSize < stats.totalRuns) {
+            getString(R.string.dashboard_sample_hint, stats.sampleSize)
+        } else ""
+        performanceSampleHint.text = sampleHint
 
         // Sparkline
         sparklineView.setData(
@@ -291,39 +323,41 @@ class TaskHistoryActivity : AppCompatActivity() {
         )
 
         // Success Rate + Ring
-        successRingView.setData(stats.statusCounts.map {
-            StatusSlice(label = it.label, count = it.count, color = it.color)
-        })
+        successRateSampleHint.text = sampleHint
+        successRingView.setData(stats.statusCounts)
 
         // Status Legend
         statusLegend.removeAllViews()
+        val rowPadding = (3 * resources.displayMetrics.density).toInt()
+        val dotSize = (8 * resources.displayMetrics.density).toInt()
+        val secondaryColor = ContextCompat.getColor(this, R.color.task_prompt_text_secondary)
+        val primaryColor = ContextCompat.getColor(this, R.color.text_white)
         for (sc in stats.statusCounts) {
-            val row = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(0, (3 * resources.displayMetrics.density).toInt(), 0, (3 * resources.displayMetrics.density).toInt())
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, rowPadding, 0, rowPadding)
             }
             val dot = View(this).apply {
-                val size = (8 * resources.displayMetrics.density).toInt()
-                layoutParams = android.widget.LinearLayout.LayoutParams(size, size).apply {
-                    marginEnd = (8 * resources.displayMetrics.density).toInt()
+                layoutParams = LinearLayout.LayoutParams(dotSize, dotSize).apply {
+                    marginEnd = dotSize
                 }
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
                     setColor(sc.color)
                 }
             }
             val label = TextView(this).apply {
-                text = sc.label
-                setTextColor(ContextCompat.getColor(this@TaskHistoryActivity, R.color.task_prompt_text_secondary))
+                text = PortalTaskUiSupport.statusLabel(this@TaskHistoryActivity, sc.status)
+                setTextColor(secondaryColor)
                 textSize = 12f
-                layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val count = TextView(this).apply {
                 text = sc.count.toString()
-                setTextColor(ContextCompat.getColor(this@TaskHistoryActivity, R.color.text_white))
+                setTextColor(primaryColor)
                 textSize = 12f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                typeface = Typeface.DEFAULT_BOLD
             }
             row.addView(dot)
             row.addView(label)
@@ -344,11 +378,9 @@ class TaskHistoryActivity : AppCompatActivity() {
         // Total Runs
         totalRunsValue.text = String.format(Locale.US, "%,d", stats.totalRuns)
         totalRunsDetail.text = stats.lastTaskAgoMs?.let { ms ->
-            getString(R.string.dashboard_last_task_format, DashboardStats.formatTimeAgo(ms))
+            getString(R.string.dashboard_last_task_format, PortalTaskUiSupport.formatTimeAgo(ms))
         } ?: getString(R.string.dashboard_no_tasks_yet)
     }
-
-    // --- History Tab ---
 
     private fun setupHistoryTab() {
         footerView = buildFooterView()
@@ -379,9 +411,14 @@ class TaskHistoryActivity : AppCompatActivity() {
         })
 
         retryButton.setOnClickListener { loadTasks(reset = true) }
-        searchInput.doAfterTextChanged {
-            scheduleSearch()
-        }
+        searchInput.doAfterTextChanged { scheduleSearch() }
+        historySwipeRefresh.setColorSchemeColors(
+            ContextCompat.getColor(this, R.color.task_prompt_accent),
+        )
+        historySwipeRefresh.setProgressBackgroundColorSchemeColor(
+            ContextCompat.getColor(this, R.color.background_card),
+        )
+        historySwipeRefresh.setOnRefreshListener { refreshAll() }
     }
 
     private fun scheduleSearch() {
@@ -481,8 +518,6 @@ class TaskHistoryActivity : AppCompatActivity() {
         }
     }
 
-    // --- Shared Helpers ---
-
     private fun hasValidSession(showToast: Boolean): Boolean {
         val authToken = currentAuthToken()
         if (authToken.isBlank()) {
@@ -514,7 +549,7 @@ class TaskHistoryActivity : AppCompatActivity() {
         val padding = (12 * resources.displayMetrics.density).toInt()
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER
+            gravity = Gravity.CENTER
             setPadding(padding, padding, padding, padding)
             addView(ProgressBar(context))
             addView(TextView(context).apply {
@@ -525,8 +560,6 @@ class TaskHistoryActivity : AppCompatActivity() {
             })
         }
     }
-
-    // --- History Adapter ---
 
     private inner class TaskHistoryAdapter : BaseAdapter() {
         private val inflater = LayoutInflater.from(this@TaskHistoryActivity)

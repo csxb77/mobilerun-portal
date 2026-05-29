@@ -310,6 +310,7 @@
     <string name="dashboard_last_task_format">last task %1$s</string>
     <string name="dashboard_no_tasks_yet">no tasks yet</string>
     <string name="dashboard_not_available">N/A</string>
+    <string name="dashboard_sample_hint">based on last %1$d tasks</string>
     <string name="dashboard_loading">Loading dashboard…</string>
     <string name="dashboard_error">Could not load dashboard data.</string>
 </resources>

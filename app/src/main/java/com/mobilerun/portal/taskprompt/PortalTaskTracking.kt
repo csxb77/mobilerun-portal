@@ -27,6 +27,7 @@ data class PortalTaskHistoryItem(
     val status: String,
     val deviceId: String? = null,
     val createdAt: String? = null,
+    val claimedAt: String? = null,
     val finishedAt: String? = null,
     val steps: Int? = null,
     val summary: String? = null,

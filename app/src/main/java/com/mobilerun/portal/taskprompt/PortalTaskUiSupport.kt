@@ -105,4 +105,43 @@ object PortalTaskUiSupport {
             null -> context.getString(R.string.task_details_value_unavailable)
         }
     }
+
+    fun statusColor(status: String): Int {
+        return when (status) {
+            PortalTaskTracking.STATUS_COMPLETED -> 0xFF0D9373.toInt()
+            PortalTaskTracking.STATUS_FAILED -> 0xFFC0392B.toInt()
+            PortalTaskTracking.STATUS_CANCELLED -> 0xFF888888.toInt()
+            PortalTaskTracking.STATUS_CANCELLING -> 0xFFCCA335.toInt()
+            PortalTaskTracking.STATUS_RUNNING -> 0xFFCCA335.toInt()
+            PortalTaskTracking.STATUS_CREATED -> 0xFF4A90D9.toInt()
+            PortalTaskTracking.STATUS_PAUSED -> 0xFFB8A060.toInt()
+            PortalTaskTracking.STATUS_TRACKING_TIMEOUT -> 0xFF888888.toInt()
+            else -> 0xFF555555.toInt()
+        }
+    }
+
+    fun formatDuration(ms: Long): String {
+        val totalSeconds = ms / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return when {
+            hours > 0 -> "${hours}h ${minutes}m"
+            minutes > 0 -> "${minutes}m ${seconds}s"
+            else -> "${seconds}s"
+        }
+    }
+
+    fun formatTimeAgo(ms: Long): String {
+        val seconds = ms / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val days = hours / 24
+        return when {
+            days > 0 -> "${days}d ago"
+            hours > 0 -> "${hours}h ago"
+            minutes > 0 -> "${minutes}m ago"
+            else -> "just now"
+        }
+    }
 }

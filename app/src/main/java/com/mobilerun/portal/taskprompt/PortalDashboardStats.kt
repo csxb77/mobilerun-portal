@@ -1,35 +1,31 @@
-package com.mobilerun.portal.ui.taskprompt
+package com.mobilerun.portal.taskprompt
 
-import com.mobilerun.portal.taskprompt.PortalCloudClient
-import com.mobilerun.portal.taskprompt.PortalTaskHistoryItem
-import com.mobilerun.portal.taskprompt.PortalTaskTimestampSupport
-import com.mobilerun.portal.taskprompt.PortalTaskTracking
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-data class DayActivity(
+data class PortalDayActivity(
     val date: LocalDate,
     val label: String,
     val count: Int,
 )
 
-data class StatusCount(
+data class PortalStatusCount(
     val status: String,
-    val label: String,
     val count: Int,
     val color: Int,
 )
 
-data class DashboardStats(
+data class PortalDashboardStats(
+    val sampleSize: Int,
     val totalRuns: Int,
     val completedCount: Int,
     val failedCount: Int,
     val successRate: Double?,
-    val statusCounts: List<StatusCount>,
-    val activityByDay: List<DayActivity>,
+    val statusCounts: List<PortalStatusCount>,
+    val activityByDay: List<PortalDayActivity>,
     val avgDurationMs: Long?,
     val avgSteps: Int?,
     val topModel: String?,
@@ -39,33 +35,11 @@ data class DashboardStats(
         private const val SPARKLINE_DAYS = 14
         private val DATE_LABEL_FORMAT = DateTimeFormatter.ofPattern("MMM d", Locale.US)
 
-        private val STATUS_COLORS = mapOf(
-            PortalTaskTracking.STATUS_COMPLETED to 0xFF0D9373.toInt(),
-            PortalTaskTracking.STATUS_FAILED to 0xFFC0392B.toInt(),
-            PortalTaskTracking.STATUS_CANCELLED to 0xFF888888.toInt(),
-            PortalTaskTracking.STATUS_CANCELLING to 0xFFCCA335.toInt(),
-            PortalTaskTracking.STATUS_RUNNING to 0xFFCCA335.toInt(),
-            PortalTaskTracking.STATUS_CREATED to 0xFF4A90D9.toInt(),
-            PortalTaskTracking.STATUS_PAUSED to 0xFFB8A060.toInt(),
-            PortalTaskTracking.STATUS_TRACKING_TIMEOUT to 0xFF888888.toInt(),
-        )
-
-        private val STATUS_LABELS = mapOf(
-            PortalTaskTracking.STATUS_COMPLETED to "Completed",
-            PortalTaskTracking.STATUS_FAILED to "Failed",
-            PortalTaskTracking.STATUS_CANCELLED to "Cancelled",
-            PortalTaskTracking.STATUS_CANCELLING to "Cancelling",
-            PortalTaskTracking.STATUS_RUNNING to "Running",
-            PortalTaskTracking.STATUS_CREATED to "Created",
-            PortalTaskTracking.STATUS_PAUSED to "Paused",
-            PortalTaskTracking.STATUS_TRACKING_TIMEOUT to "Tracking stopped",
-        )
-
         fun compute(
             items: List<PortalTaskHistoryItem>,
             total: Int,
             nowMs: Long = System.currentTimeMillis(),
-        ): DashboardStats {
+        ): PortalDashboardStats {
             val completed = items.count { it.status == PortalTaskTracking.STATUS_COMPLETED }
             val failed = items.count { it.status == PortalTaskTracking.STATUS_FAILED }
             val finished = completed + failed
@@ -74,11 +48,10 @@ data class DashboardStats(
             val countsByStatus = items.groupingBy { it.status }.eachCount()
             val statusCounts = countsByStatus
                 .map { (status, count) ->
-                    StatusCount(
+                    PortalStatusCount(
                         status = status,
-                        label = STATUS_LABELS[status] ?: status.replaceFirstChar { it.uppercase() },
                         count = count,
-                        color = STATUS_COLORS[status] ?: 0xFF555555.toInt(),
+                        color = PortalTaskUiSupport.statusColor(status),
                     )
                 }
                 .sortedByDescending { it.count }
@@ -97,11 +70,13 @@ data class DashboardStats(
                 }
             }
             val activityByDay = buckets.map { (date, count) ->
-                DayActivity(date, date.format(DATE_LABEL_FORMAT), count)
+                PortalDayActivity(date, date.format(DATE_LABEL_FORMAT), count)
             }
 
             val durations = items.mapNotNull { item ->
-                val start = PortalTaskTimestampSupport.parseEpochMillis(item.createdAt) ?: return@mapNotNull null
+                val start = PortalTaskTimestampSupport.parseEpochMillis(item.claimedAt)
+                    ?: PortalTaskTimestampSupport.parseEpochMillis(item.createdAt)
+                    ?: return@mapNotNull null
                 val end = PortalTaskTimestampSupport.parseEpochMillis(item.finishedAt) ?: return@mapNotNull null
                 val ms = end - start
                 if (ms > 0) ms else null
@@ -127,7 +102,8 @@ data class DashboardStats(
                 (nowMs - lastTaskEpochMs).coerceAtLeast(0L)
             } else null
 
-            return DashboardStats(
+            return PortalDashboardStats(
+                sampleSize = items.size,
                 totalRuns = total,
                 completedCount = completed,
                 failedCount = failed,
@@ -139,35 +115,6 @@ data class DashboardStats(
                 topModel = topModel,
                 lastTaskAgoMs = lastTaskAgoMs,
             )
-        }
-
-        fun formatDuration(ms: Long): String {
-            val totalSeconds = ms / 1000
-            val hours = totalSeconds / 3600
-            val minutes = (totalSeconds % 3600) / 60
-            val seconds = totalSeconds % 60
-            return when {
-                hours > 0 -> "${hours}h ${minutes}m"
-                minutes > 0 -> "${minutes}m ${seconds}s"
-                else -> "${seconds}s"
-            }
-        }
-
-        fun formatModelLabel(modelId: String): String {
-            return PortalCloudClient.formatModelLabel(modelId)
-        }
-
-        fun formatTimeAgo(ms: Long): String {
-            val seconds = ms / 1000
-            val minutes = seconds / 60
-            val hours = minutes / 60
-            val days = hours / 24
-            return when {
-                days > 0 -> "${days}d ago"
-                hours > 0 -> "${hours}h ago"
-                minutes > 0 -> "${minutes}m ago"
-                else -> "just now"
-            }
         }
     }
 }
