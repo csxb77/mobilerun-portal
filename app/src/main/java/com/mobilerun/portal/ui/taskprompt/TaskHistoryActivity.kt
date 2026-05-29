@@ -119,11 +119,11 @@ class TaskHistoryActivity : AppCompatActivity() {
     private var errorMessage: String? = null
     private var hasLoadedHistory = false
 
-    private var dashboardRequestToken = 0
-    private var isDashboardLoading = false
-    private var hasLoadedDashboard = false
+    private var dataRequestToken = 0
+    private var isDataLoading = false
+    private var hasLoadedData = false
     private var dashboardStats: PortalDashboardStats? = null
-    private var cachedDashboardPage: PortalTaskHistoryPage? = null
+    private var cachedTaskPage: PortalTaskHistoryPage? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -170,8 +170,8 @@ class TaskHistoryActivity : AppCompatActivity() {
     private fun showDashboardTab() {
         searchRunnable?.let(handler::removeCallbacks)
         historyContainer.visibility = View.GONE
-        if (!hasLoadedDashboard && !isDashboardLoading) {
-            loadDashboard()
+        if (!hasLoadedData && !isDataLoading) {
+            loadData()
         } else {
             renderDashboardState()
         }
@@ -189,7 +189,7 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun seedHistoryFromDashboard(): Boolean {
-        val cached = cachedDashboardPage ?: return false
+        val cached = cachedTaskPage ?: return false
         val query = searchInput.text?.toString()?.trim().orEmpty()
         if (query.isNotBlank()) return false
 
@@ -205,7 +205,7 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun setupDashboardTab() {
-        dashboardRetryButton.setOnClickListener { loadDashboard() }
+        dashboardRetryButton.setOnClickListener { loadData() }
         dashboardSwipeRefresh.setColorSchemeColors(
             ContextCompat.getColor(this, R.color.task_prompt_accent),
         )
@@ -215,20 +215,20 @@ class TaskHistoryActivity : AppCompatActivity() {
         dashboardSwipeRefresh.setOnRefreshListener { refreshAll() }
     }
 
-    private fun loadDashboard() {
+    private fun loadData() {
         val authToken = currentAuthToken()
         val restBaseUrl = currentRestBaseUrl()
         if (authToken.isBlank() || restBaseUrl == null) {
-            hasLoadedDashboard = false
+            hasLoadedData = false
             dashboardStats = null
             renderDashboardState()
             return
         }
 
-        isDashboardLoading = true
+        isDataLoading = true
         renderDashboardState()
 
-        val localToken = ++dashboardRequestToken
+        val localToken = ++dataRequestToken
         portalCloudClient.listTasks(
             restBaseUrl = restBaseUrl,
             authToken = authToken,
@@ -248,19 +248,19 @@ class TaskHistoryActivity : AppCompatActivity() {
                 is PortalTaskHistoryResult.Error -> null
             }
             runOnUiThread {
-                if (isFinishing || isDestroyed || localToken != dashboardRequestToken) {
+                if (isFinishing || isDestroyed || localToken != dataRequestToken) {
                     return@runOnUiThread
                 }
-                isDashboardLoading = false
+                isDataLoading = false
                 historySwipeRefresh.isRefreshing = false
                 if (stats != null) {
-                    hasLoadedDashboard = true
+                    hasLoadedData = true
                     dashboardStats = stats
-                    cachedDashboardPage = dashboardItems
+                    cachedTaskPage = dashboardItems
                 } else {
-                    hasLoadedDashboard = false
+                    hasLoadedData = false
                     dashboardStats = null
-                    cachedDashboardPage = null
+                    cachedTaskPage = null
                 }
                 if (tabLayout.selectedTabPosition == 1 && dashboardItems != null) {
                     seedHistoryFromDashboard()
@@ -271,19 +271,19 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun refreshAll() {
-        if (isDashboardLoading) return
-        hasLoadedDashboard = false
+        if (isDataLoading) return
+        hasLoadedData = false
         hasLoadedHistory = false
-        cachedDashboardPage = null
+        cachedTaskPage = null
         items.clear()
         adapter.notifyDataSetChanged()
-        loadDashboard()
+        loadData()
     }
 
     private fun renderDashboardState() {
         if (tabLayout.selectedTabPosition != 0) return
 
-        if (isDashboardLoading) {
+        if (isDataLoading) {
             if (!dashboardSwipeRefresh.isRefreshing) {
                 dashboardSwipeRefresh.visibility = View.GONE
                 dashboardLoading.visibility = View.VISIBLE
