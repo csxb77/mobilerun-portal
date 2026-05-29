@@ -252,6 +252,7 @@ class TaskHistoryActivity : AppCompatActivity() {
                     return@runOnUiThread
                 }
                 isDashboardLoading = false
+                historySwipeRefresh.isRefreshing = false
                 if (stats != null) {
                     hasLoadedDashboard = true
                     dashboardStats = stats
@@ -260,6 +261,9 @@ class TaskHistoryActivity : AppCompatActivity() {
                     hasLoadedDashboard = false
                     dashboardStats = null
                     cachedDashboardPage = null
+                }
+                if (tabLayout.selectedTabPosition == 1 && dashboardItems != null) {
+                    seedHistoryFromDashboard()
                 }
                 renderDashboardState()
             }
