@@ -7,7 +7,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class PortalDayActivity(
-    val date: LocalDate,
     val label: String,
     val count: Int,
 )
@@ -70,7 +69,7 @@ data class PortalDashboardStats(
                 }
             }
             val activityByDay = buckets.map { (date, count) ->
-                PortalDayActivity(date, date.format(DATE_LABEL_FORMAT), count)
+                PortalDayActivity(date.format(DATE_LABEL_FORMAT), count)
             }
 
             val durations = items.mapNotNull { item ->

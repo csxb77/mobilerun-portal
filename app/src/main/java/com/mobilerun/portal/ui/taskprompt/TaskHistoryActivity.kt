@@ -204,15 +204,19 @@ class TaskHistoryActivity : AppCompatActivity() {
         return true
     }
 
-    private fun setupDashboardTab() {
-        dashboardRetryButton.setOnClickListener { loadData() }
-        dashboardSwipeRefresh.setColorSchemeColors(
+    private fun configureSwipeRefresh(swipeRefresh: SwipeRefreshLayout) {
+        swipeRefresh.setColorSchemeColors(
             ContextCompat.getColor(this, R.color.task_prompt_accent),
         )
-        dashboardSwipeRefresh.setProgressBackgroundColorSchemeColor(
+        swipeRefresh.setProgressBackgroundColorSchemeColor(
             ContextCompat.getColor(this, R.color.background_card),
         )
-        dashboardSwipeRefresh.setOnRefreshListener { refreshAll() }
+        swipeRefresh.setOnRefreshListener { refreshAll() }
+    }
+
+    private fun setupDashboardTab() {
+        dashboardRetryButton.setOnClickListener { loadData() }
+        configureSwipeRefresh(dashboardSwipeRefresh)
     }
 
     private fun loadData() {
@@ -262,8 +266,13 @@ class TaskHistoryActivity : AppCompatActivity() {
                     dashboardStats = null
                     cachedTaskPage = null
                 }
-                if (tabLayout.selectedTabPosition == 1 && dashboardItems != null) {
-                    seedHistoryFromDashboard()
+                if (tabLayout.selectedTabPosition == 1) {
+                    if (dashboardItems != null) {
+                        seedHistoryFromDashboard()
+                    } else {
+                        hasLoadedHistory = items.isNotEmpty()
+                        Toast.makeText(this, getString(R.string.dashboard_error), Toast.LENGTH_SHORT).show()
+                    }
                 }
                 renderDashboardState()
             }
@@ -275,8 +284,6 @@ class TaskHistoryActivity : AppCompatActivity() {
         hasLoadedData = false
         hasLoadedHistory = false
         cachedTaskPage = null
-        items.clear()
-        adapter.notifyDataSetChanged()
         loadData()
     }
 
@@ -295,7 +302,6 @@ class TaskHistoryActivity : AppCompatActivity() {
         }
 
         dashboardSwipeRefresh.isRefreshing = false
-        historySwipeRefresh.isRefreshing = false
 
         val stats = dashboardStats
         if (stats == null) {
@@ -416,13 +422,10 @@ class TaskHistoryActivity : AppCompatActivity() {
 
         retryButton.setOnClickListener { loadTasks(reset = true) }
         searchInput.doAfterTextChanged { scheduleSearch() }
-        historySwipeRefresh.setColorSchemeColors(
-            ContextCompat.getColor(this, R.color.task_prompt_accent),
-        )
-        historySwipeRefresh.setProgressBackgroundColorSchemeColor(
-            ContextCompat.getColor(this, R.color.background_card),
-        )
-        historySwipeRefresh.setOnRefreshListener { refreshAll() }
+        configureSwipeRefresh(historySwipeRefresh)
+        historySwipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            listView.visibility == View.VISIBLE && listView.canScrollVertically(-1)
+        }
     }
 
     private fun scheduleSearch() {

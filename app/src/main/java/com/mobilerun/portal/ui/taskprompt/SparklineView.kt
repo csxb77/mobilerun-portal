@@ -281,7 +281,7 @@ class SparklineView @JvmOverloads constructor(
         canvas.drawCircle(x, y, activeDotRadius, dotPaint)
         canvas.drawCircle(x, y, activeDotRadius, activeDotStrokePaint)
 
-        val tooltipText = "$taskCount tasks"
+        val tooltipText = context.getString(R.string.dashboard_sparkline_tooltip, taskCount)
         val tooltipW = tooltipTextPaint.measureText(tooltipText)
             .coerceAtLeast(tooltipSubPaint.measureText(dateLabel)) + 32f * density
         val tooltipH = 44f * density
