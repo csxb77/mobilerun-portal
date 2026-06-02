@@ -44,4 +44,40 @@ class TaskHistoryQueryStateTest {
             ),
         )
     }
+
+    @Test
+    fun hasQueryChangedSinceRequest_returnsFalseWhenQueriesMatch() {
+        assertFalse(
+            TaskHistoryQueryState.hasQueryChangedSinceRequest(
+                requestQuery = "open settings",
+                currentQuery = "open settings",
+            ),
+        )
+    }
+
+    @Test
+    fun hasQueryChangedSinceRequest_returnsTrueWhenCurrentQueryDiffers() {
+        assertTrue(
+            TaskHistoryQueryState.hasQueryChangedSinceRequest(
+                requestQuery = "open settings",
+                currentQuery = "close settings",
+            ),
+        )
+    }
+
+    @Test
+    fun hasQueryChangedSinceRequest_detectsBlankTransitions() {
+        assertTrue(
+            TaskHistoryQueryState.hasQueryChangedSinceRequest(
+                requestQuery = "",
+                currentQuery = "open settings",
+            ),
+        )
+        assertTrue(
+            TaskHistoryQueryState.hasQueryChangedSinceRequest(
+                requestQuery = "open settings",
+                currentQuery = "",
+            ),
+        )
+    }
 }

@@ -192,9 +192,15 @@ class TaskHistoryActivity : AppCompatActivity() {
                 currentQuery = query,
             )
         ) {
-            if (query.isBlank() && seedHistoryFromDashboard()) return
-            loadTasks(reset = true)
+            loadHistoryForCurrentQuery()
         }
+    }
+
+    private fun loadHistoryForCurrentQuery() {
+        searchRunnable?.let(handler::removeCallbacks)
+        searchRunnable = null
+        if (currentHistoryQuery().isBlank() && seedHistoryFromDashboard()) return
+        loadTasks(reset = true)
     }
 
     private fun seedHistoryFromDashboard(): Boolean {
@@ -491,6 +497,20 @@ class TaskHistoryActivity : AppCompatActivity() {
                 isInitialLoading = false
                 isLoadingMore = false
                 historySwipeRefresh.isRefreshing = false
+                if (
+                    reset &&
+                    TaskHistoryQueryState.hasQueryChangedSinceRequest(
+                        requestQuery = requestQuery,
+                        currentQuery = currentHistoryQuery(),
+                    )
+                ) {
+                    renderState()
+                    if (tabLayout.selectedTabPosition == 1) {
+                        loadHistoryForCurrentQuery()
+                    }
+                    return@runOnUiThread
+                }
+
                 when (result) {
                     is PortalTaskHistoryResult.Success -> {
                         errorMessage = null

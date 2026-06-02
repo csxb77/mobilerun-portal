@@ -12,4 +12,11 @@ internal object TaskHistoryQueryState {
     ): Boolean {
         return !hasLoadedHistory || loadedHistoryQuery != currentQuery
     }
+
+    fun hasQueryChangedSinceRequest(
+        requestQuery: String,
+        currentQuery: String,
+    ): Boolean {
+        return requestQuery != currentQuery
+    }
 }
