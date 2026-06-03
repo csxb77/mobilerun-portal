@@ -1,6 +1,7 @@
 package com.mobilerun.portal.taskprompt
 
 import android.content.Context
+import androidx.annotation.ColorRes
 import androidx.annotation.StringRes
 import com.mobilerun.portal.R
 import com.mobilerun.portal.state.ConnectionState
@@ -106,17 +107,18 @@ object PortalTaskUiSupport {
         }
     }
 
-    fun statusColor(status: String): Int {
+    @ColorRes
+    fun statusColorRes(status: String): Int {
         return when (status) {
-            PortalTaskTracking.STATUS_COMPLETED -> 0xFF0D9373.toInt()
-            PortalTaskTracking.STATUS_FAILED -> 0xFFC0392B.toInt()
-            PortalTaskTracking.STATUS_CANCELLED -> 0xFF888888.toInt()
-            PortalTaskTracking.STATUS_CANCELLING -> 0xFFCCA335.toInt()
-            PortalTaskTracking.STATUS_RUNNING -> 0xFFCCA335.toInt()
-            PortalTaskTracking.STATUS_CREATED -> 0xFF4A90D9.toInt()
-            PortalTaskTracking.STATUS_PAUSED -> 0xFFB8A060.toInt()
-            PortalTaskTracking.STATUS_TRACKING_TIMEOUT -> 0xFF888888.toInt()
-            else -> 0xFF555555.toInt()
+            PortalTaskTracking.STATUS_COMPLETED -> R.color.task_status_completed
+            PortalTaskTracking.STATUS_FAILED -> R.color.task_status_failed
+            PortalTaskTracking.STATUS_CANCELLED -> R.color.task_status_cancelled
+            PortalTaskTracking.STATUS_CANCELLING -> R.color.task_status_cancelling
+            PortalTaskTracking.STATUS_RUNNING -> R.color.task_status_running
+            PortalTaskTracking.STATUS_CREATED -> R.color.task_status_created
+            PortalTaskTracking.STATUS_PAUSED -> R.color.task_status_paused
+            PortalTaskTracking.STATUS_TRACKING_TIMEOUT -> R.color.task_status_tracking_timeout
+            else -> R.color.task_status_unknown
         }
     }
 

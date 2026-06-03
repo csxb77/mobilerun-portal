@@ -6,6 +6,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.content.ContextCompat
+import com.mobilerun.portal.R
 import com.mobilerun.portal.taskprompt.PortalStatusCount
 
 class SuccessRingView @JvmOverloads constructor(
@@ -30,7 +32,7 @@ class SuccessRingView @JvmOverloads constructor(
 
     private val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = 0xFF2A2A2A.toInt()
+        color = ContextCompat.getColor(context, R.color.task_status_ring_empty)
         strokeCap = Paint.Cap.ROUND
         strokeWidth = this@SuccessRingView.strokeWidth
     }
@@ -65,7 +67,7 @@ class SuccessRingView @JvmOverloads constructor(
         }
 
         if (slices.size == 1) {
-            slicePaint.color = slices[0].color
+            slicePaint.color = ContextCompat.getColor(context, slices[0].colorRes)
             canvas.drawArc(oval, -90f, 360f, false, slicePaint)
             return
         }
@@ -81,7 +83,7 @@ class SuccessRingView @JvmOverloads constructor(
             } else {
                 slice.count.toFloat() / total * availableSweep
             }
-            slicePaint.color = slice.color
+            slicePaint.color = ContextCompat.getColor(context, slice.colorRes)
             canvas.drawArc(oval, startAngle, sweep, false, slicePaint)
             sweepUsed += sweep
             startAngle += sweep + gapDegrees

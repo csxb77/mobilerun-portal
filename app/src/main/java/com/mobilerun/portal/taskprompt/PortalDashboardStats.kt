@@ -1,5 +1,6 @@
 package com.mobilerun.portal.taskprompt
 
+import androidx.annotation.ColorRes
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -14,7 +15,7 @@ data class PortalDayActivity(
 data class PortalStatusCount(
     val status: String,
     val count: Int,
-    val color: Int,
+    @ColorRes val colorRes: Int,
 )
 
 data class PortalDashboardStats(
@@ -50,7 +51,7 @@ data class PortalDashboardStats(
                     PortalStatusCount(
                         status = status,
                         count = count,
-                        color = PortalTaskUiSupport.statusColor(status),
+                        colorRes = PortalTaskUiSupport.statusColorRes(status),
                     )
                 }
                 .sortedByDescending { it.count }

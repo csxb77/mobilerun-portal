@@ -14,7 +14,6 @@ import android.view.ViewGroup
 import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -33,9 +32,7 @@ import com.mobilerun.portal.taskprompt.PortalTaskHistoryPage
 import com.mobilerun.portal.taskprompt.PortalTaskHistoryResult
 import com.mobilerun.portal.taskprompt.PortalTaskStatusAppearance
 import com.mobilerun.portal.taskprompt.PortalTaskUiSupport
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
-import com.google.android.material.textfield.TextInputEditText
 import java.util.Locale
 
 class TaskHistoryActivity : AppCompatActivity() {
@@ -56,59 +53,6 @@ class TaskHistoryActivity : AppCompatActivity() {
     private lateinit var binding: ActivityTaskHistoryBinding
     private lateinit var footerView: LinearLayout
     private lateinit var adapter: TaskHistoryAdapter
-
-    private val historySwipeRefresh: SwipeRefreshLayout
-        get() = binding.taskHistorySwipeRefresh
-    private val searchInput: TextInputEditText
-        get() = binding.taskHistorySearchInput
-    private val listView: ListView
-        get() = binding.taskHistoryList
-    private val loadingView: View
-        get() = binding.taskHistoryLoadingView
-    private val emptyView: View
-        get() = binding.taskHistoryEmptyView
-    private val emptyText: TextView
-        get() = binding.taskHistoryEmptyText
-    private val retryButton: MaterialButton
-        get() = binding.taskHistoryRetryButton
-
-    private val tabLayout: TabLayout
-        get() = binding.taskTabs
-    private val dashboardSwipeRefresh: SwipeRefreshLayout
-        get() = binding.taskDashboardSwipeRefresh
-    private val historyContainer: View
-        get() = binding.taskHistoryContainer
-    private val dashboardLoading: View
-        get() = binding.taskDashboardLoading
-    private val dashboardError: View
-        get() = binding.taskDashboardError
-    private val dashboardRetryButton: MaterialButton
-        get() = binding.taskDashboardRetryButton
-
-    private val avgDurationValue: TextView
-        get() = binding.dashboardAvgDurationValue
-    private val avgStepsValue: TextView
-        get() = binding.dashboardAvgStepsValue
-    private val topModelValue: TextView
-        get() = binding.dashboardTopModelValue
-    private val sparklineView: SparklineView
-        get() = binding.dashboardSparkline
-    private val successRateValue: TextView
-        get() = binding.dashboardSuccessRateValue
-    private val successRateDetail: TextView
-        get() = binding.dashboardSuccessRateDetail
-    private val totalRunsValue: TextView
-        get() = binding.dashboardTotalRunsValue
-    private val totalRunsDetail: TextView
-        get() = binding.dashboardTotalRunsDetail
-    private val successRingView: SuccessRingView
-        get() = binding.dashboardSuccessRing
-    private val statusLegend: LinearLayout
-        get() = binding.dashboardStatusLegend
-    private val performanceSampleHint: TextView
-        get() = binding.dashboardPerformanceSampleHint
-    private val successRateSampleHint: TextView
-        get() = binding.dashboardSuccessRateSampleHint
 
     private var searchRunnable: Runnable? = null
     private var currentPage = 0
@@ -152,10 +96,10 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun setupTabs() {
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_dashboard))
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tasks_tab_history))
+        binding.taskTabs.addTab(binding.taskTabs.newTab().setText(R.string.tasks_tab_dashboard))
+        binding.taskTabs.addTab(binding.taskTabs.newTab().setText(R.string.tasks_tab_history))
 
-        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+        binding.taskTabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 when (tab.position) {
                     0 -> showDashboardTab()
@@ -170,7 +114,7 @@ class TaskHistoryActivity : AppCompatActivity() {
 
     private fun showDashboardTab() {
         searchRunnable?.let(handler::removeCallbacks)
-        historyContainer.visibility = View.GONE
+        binding.taskHistoryContainer.visibility = View.GONE
         if (!hasLoadedData && !isDataLoading) {
             loadData()
         } else {
@@ -179,10 +123,10 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun showHistoryTab() {
-        dashboardSwipeRefresh.visibility = View.GONE
-        dashboardLoading.visibility = View.GONE
-        dashboardError.visibility = View.GONE
-        historyContainer.visibility = View.VISIBLE
+        binding.taskDashboardSwipeRefresh.visibility = View.GONE
+        binding.taskDashboardLoading.visibility = View.GONE
+        binding.taskDashboardError.visibility = View.GONE
+        binding.taskHistoryContainer.visibility = View.VISIBLE
         val query = currentHistoryQuery()
         if (
             !isInitialLoading &&
@@ -221,7 +165,7 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun currentHistoryQuery(): String {
-        return TaskHistoryQueryState.normalizeQuery(searchInput.text)
+        return TaskHistoryQueryState.normalizeQuery(binding.taskHistorySearchInput.text)
     }
 
     private fun configureSwipeRefresh(
@@ -238,8 +182,8 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun setupDashboardTab() {
-        dashboardRetryButton.setOnClickListener { loadData() }
-        configureSwipeRefresh(dashboardSwipeRefresh) { refreshDashboard() }
+        binding.taskDashboardRetryButton.setOnClickListener { loadData() }
+        configureSwipeRefresh(binding.taskDashboardSwipeRefresh) { refreshDashboard() }
     }
 
     private fun loadData() {
@@ -288,7 +232,7 @@ class TaskHistoryActivity : AppCompatActivity() {
                     dashboardStats = null
                     cachedTaskPage = null
                 }
-                if (tabLayout.selectedTabPosition == 1) {
+                if (binding.taskTabs.selectedTabPosition == 1) {
                     if (dashboardItems != null) {
                         seedHistoryFromDashboard()
                     } else {
@@ -310,56 +254,56 @@ class TaskHistoryActivity : AppCompatActivity() {
     }
 
     private fun renderDashboardState() {
-        if (tabLayout.selectedTabPosition != 0) return
+        if (binding.taskTabs.selectedTabPosition != 0) return
 
         if (isDataLoading) {
-            if (!dashboardSwipeRefresh.isRefreshing) {
-                dashboardSwipeRefresh.visibility = View.GONE
-                dashboardLoading.visibility = View.VISIBLE
+            if (!binding.taskDashboardSwipeRefresh.isRefreshing) {
+                binding.taskDashboardSwipeRefresh.visibility = View.GONE
+                binding.taskDashboardLoading.visibility = View.VISIBLE
             } else {
-                dashboardLoading.visibility = View.GONE
+                binding.taskDashboardLoading.visibility = View.GONE
             }
-            dashboardError.visibility = View.GONE
+            binding.taskDashboardError.visibility = View.GONE
             return
         }
 
-        dashboardSwipeRefresh.isRefreshing = false
+        binding.taskDashboardSwipeRefresh.isRefreshing = false
 
         val stats = dashboardStats
         if (stats == null) {
-            dashboardSwipeRefresh.visibility = View.GONE
-            dashboardLoading.visibility = View.GONE
-            dashboardError.visibility = View.VISIBLE
+            binding.taskDashboardSwipeRefresh.visibility = View.GONE
+            binding.taskDashboardLoading.visibility = View.GONE
+            binding.taskDashboardError.visibility = View.VISIBLE
             return
         }
 
-        dashboardSwipeRefresh.visibility = View.VISIBLE
-        dashboardLoading.visibility = View.GONE
-        dashboardError.visibility = View.GONE
+        binding.taskDashboardSwipeRefresh.visibility = View.VISIBLE
+        binding.taskDashboardLoading.visibility = View.GONE
+        binding.taskDashboardError.visibility = View.GONE
 
         val na = getString(R.string.dashboard_not_available)
 
         // Performance
-        avgDurationValue.text = stats.avgDurationMs?.let { PortalTaskUiSupport.formatDuration(it) } ?: na
-        avgStepsValue.text = stats.avgSteps?.toString() ?: na
-        topModelValue.text = stats.topModel?.let { PortalCloudClient.formatModelLabel(it) } ?: na
+        binding.dashboardAvgDurationValue.text = stats.avgDurationMs?.let { PortalTaskUiSupport.formatDuration(it) } ?: na
+        binding.dashboardAvgStepsValue.text = stats.avgSteps?.toString() ?: na
+        binding.dashboardTopModelValue.text = stats.topModel?.let { PortalCloudClient.formatModelLabel(it) } ?: na
         val sampleHint = if (stats.sampleSize < stats.totalRuns) {
             getString(R.string.dashboard_sample_hint, stats.sampleSize)
         } else ""
-        performanceSampleHint.text = sampleHint
+        binding.dashboardPerformanceSampleHint.text = sampleHint
 
         // Sparkline
-        sparklineView.setData(
+        binding.dashboardSparkline.setData(
             stats.activityByDay.map { it.count },
             stats.activityByDay.map { it.label },
         )
 
         // Success Rate + Ring
-        successRateSampleHint.text = sampleHint
-        successRingView.setData(stats.statusCounts)
+        binding.dashboardSuccessRateSampleHint.text = sampleHint
+        binding.dashboardSuccessRing.setData(stats.statusCounts)
 
         // Status Legend
-        statusLegend.removeAllViews()
+        binding.dashboardStatusLegend.removeAllViews()
         val rowPadding = (3 * resources.displayMetrics.density).toInt()
         val dotSize = (8 * resources.displayMetrics.density).toInt()
         val secondaryColor = ContextCompat.getColor(this, R.color.task_prompt_text_secondary)
@@ -376,7 +320,7 @@ class TaskHistoryActivity : AppCompatActivity() {
                 }
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(sc.color)
+                    setColor(ContextCompat.getColor(this@TaskHistoryActivity, sc.colorRes))
                 }
             }
             val label = TextView(this).apply {
@@ -394,37 +338,37 @@ class TaskHistoryActivity : AppCompatActivity() {
             row.addView(dot)
             row.addView(label)
             row.addView(count)
-            statusLegend.addView(row)
+            binding.dashboardStatusLegend.addView(row)
         }
         if (stats.successRate != null) {
-            successRateValue.text = String.format(Locale.US, "%.1f%%", stats.successRate)
+            binding.dashboardSuccessRateValue.text = String.format(Locale.US, "%.1f%%", stats.successRate)
         } else {
-            successRateValue.text = "—"
+            binding.dashboardSuccessRateValue.text = "—"
         }
-        successRateDetail.text = getString(
+        binding.dashboardSuccessRateDetail.text = getString(
             R.string.dashboard_done_failed_format,
             stats.completedCount,
             stats.failedCount,
         )
 
         // Total Runs
-        totalRunsValue.text = String.format(Locale.US, "%,d", stats.totalRuns)
-        totalRunsDetail.text = stats.lastTaskAgoMs?.let { ms ->
+        binding.dashboardTotalRunsValue.text = String.format(Locale.US, "%,d", stats.totalRuns)
+        binding.dashboardTotalRunsDetail.text = stats.lastTaskAgoMs?.let { ms ->
             getString(R.string.dashboard_last_task_format, PortalTaskUiSupport.formatTimeAgo(ms))
         } ?: getString(R.string.dashboard_no_tasks_yet)
     }
 
     private fun setupHistoryTab() {
         footerView = buildFooterView()
-        listView.addFooterView(footerView, null, false)
+        binding.taskHistoryList.addFooterView(footerView, null, false)
         footerView.visibility = View.GONE
         adapter = TaskHistoryAdapter()
-        listView.adapter = adapter
-        listView.setOnItemClickListener { _, _, position, _ ->
+        binding.taskHistoryList.adapter = adapter
+        binding.taskHistoryList.setOnItemClickListener { _, _, position, _ ->
             val item = adapter.getItem(position) as? PortalTaskHistoryItem ?: return@setOnItemClickListener
             startActivity(TaskDetailsActivity.createIntent(this, item.taskId))
         }
-        listView.setOnScrollListener(object : AbsListView.OnScrollListener {
+        binding.taskHistoryList.setOnScrollListener(object : AbsListView.OnScrollListener {
             override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) = Unit
 
             override fun onScroll(
@@ -442,11 +386,11 @@ class TaskHistoryActivity : AppCompatActivity() {
             }
         })
 
-        retryButton.setOnClickListener { loadTasks(reset = true) }
-        searchInput.doAfterTextChanged { scheduleSearch() }
-        configureSwipeRefresh(historySwipeRefresh) { loadTasks(reset = true) }
-        historySwipeRefresh.setOnChildScrollUpCallback { _, _ ->
-            listView.visibility == View.VISIBLE && listView.canScrollVertically(-1)
+        binding.taskHistoryRetryButton.setOnClickListener { loadTasks(reset = true) }
+        binding.taskHistorySearchInput.doAfterTextChanged { scheduleSearch() }
+        configureSwipeRefresh(binding.taskHistorySwipeRefresh) { loadTasks(reset = true) }
+        binding.taskHistorySwipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            binding.taskHistoryList.visibility == View.VISIBLE && binding.taskHistoryList.canScrollVertically(-1)
         }
     }
 
@@ -460,7 +404,7 @@ class TaskHistoryActivity : AppCompatActivity() {
         val authToken = currentAuthToken()
         val restBaseUrl = currentRestBaseUrl()
         if (authToken.isBlank() || restBaseUrl == null) {
-            historySwipeRefresh.isRefreshing = false
+            binding.taskHistorySwipeRefresh.isRefreshing = false
             if (hasValidSession(showToast = true)) return
             finish()
             return
@@ -496,7 +440,7 @@ class TaskHistoryActivity : AppCompatActivity() {
 
                 isInitialLoading = false
                 isLoadingMore = false
-                historySwipeRefresh.isRefreshing = false
+                binding.taskHistorySwipeRefresh.isRefreshing = false
                 if (
                     reset &&
                     TaskHistoryQueryState.hasQueryChangedSinceRequest(
@@ -505,7 +449,7 @@ class TaskHistoryActivity : AppCompatActivity() {
                     )
                 ) {
                     renderState()
-                    if (tabLayout.selectedTabPosition == 1) {
+                    if (binding.taskTabs.selectedTabPosition == 1) {
                         loadHistoryForCurrentQuery()
                     }
                     return@runOnUiThread
@@ -550,20 +494,20 @@ class TaskHistoryActivity : AppCompatActivity() {
         val showList = items.isNotEmpty()
         val showEmpty = !showLoading && !showList
 
-        loadingView.visibility = if (showLoading) View.VISIBLE else View.GONE
-        listView.visibility = if (showList) View.VISIBLE else View.GONE
-        emptyView.visibility = if (showEmpty) View.VISIBLE else View.GONE
+        binding.taskHistoryLoadingView.visibility = if (showLoading) View.VISIBLE else View.GONE
+        binding.taskHistoryList.visibility = if (showList) View.VISIBLE else View.GONE
+        binding.taskHistoryEmptyView.visibility = if (showEmpty) View.VISIBLE else View.GONE
         footerView.visibility = if (isLoadingMore) View.VISIBLE else View.GONE
 
         if (showEmpty) {
-            emptyText.text = when {
+            binding.taskHistoryEmptyText.text = when {
                 !errorMessage.isNullOrBlank() -> errorMessage
                 query.isNotBlank() -> getString(R.string.task_history_empty_search)
                 else -> getString(R.string.task_history_empty)
             }
-            retryButton.visibility = if (errorMessage.isNullOrBlank()) View.GONE else View.VISIBLE
+            binding.taskHistoryRetryButton.visibility = if (errorMessage.isNullOrBlank()) View.GONE else View.VISIBLE
         } else {
-            retryButton.visibility = View.GONE
+            binding.taskHistoryRetryButton.visibility = View.GONE
         }
     }
 
@@ -621,13 +565,13 @@ class TaskHistoryActivity : AppCompatActivity() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val itemBinding = if (convertView == null) {
-                ItemTaskHistoryBinding.inflate(inflater, parent, false).also { binding ->
-                    binding.root.tag = binding
+                ItemTaskHistoryBinding.inflate(inflater, parent, false).also { rowBinding ->
+                    rowBinding.root.tag = rowBinding
                 }
             } else {
                 (convertView.tag as? ItemTaskHistoryBinding)
-                    ?: ItemTaskHistoryBinding.bind(convertView).also { binding ->
-                        binding.root.tag = binding
+                    ?: ItemTaskHistoryBinding.bind(convertView).also { rowBinding ->
+                        rowBinding.root.tag = rowBinding
                     }
             }
             val item = items[position]
