@@ -49,6 +49,7 @@ import com.mobilerun.portal.taskprompt.PortalTaskStatusResult
 import com.mobilerun.portal.taskprompt.PortalTaskTracking
 import com.mobilerun.portal.taskprompt.PortalTaskUiSupport
 import com.mobilerun.portal.taskprompt.TaskPromptNotificationManager
+import com.mobilerun.portal.taskprompt.TaskPromptModelUiState
 import com.mobilerun.portal.ui.taskprompt.TaskPromptCardController
 import com.mobilerun.portal.ui.taskprompt.TaskDetailsActivity
 import com.mobilerun.portal.ui.taskprompt.TaskHistoryActivity
@@ -648,10 +649,24 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
             return
         }
 
+        val cachedModelState = TaskPromptModelUiState.forCachedModels(
+            isModelsLoading = isTaskPromptModelsLoading,
+            hasModels = taskPromptModels.isNotEmpty(),
+            isSubmitting = isTaskPromptSubmitting,
+            hasBlockingTask = hasBlockingTask,
+        )
         taskPromptCardController.setModelsLoading(isTaskPromptModelsLoading)
         taskPromptCardController.setSubmitting(isTaskPromptSubmitting)
-        taskPromptCardController.setSubmissionEnabled(!isTaskPromptSubmitting && !hasBlockingTask)
-        renderTaskPromptStatus()
+        taskPromptCardController.setSubmissionEnabled(cachedModelState.submissionEnabled)
+        taskPromptCardController.setModelRetryVisible(cachedModelState.showRetry)
+        if (cachedModelState.showRetry) {
+            updateTaskPromptStatus(
+                getString(R.string.task_prompt_status_models_unavailable),
+                TaskPromptCardController.StatusKind.INFO,
+            )
+        } else {
+            renderTaskPromptStatus()
+        }
         syncTaskPromptPolling()
     }
 

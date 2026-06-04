@@ -107,6 +107,7 @@ class PortalCloudClient(
 ) {
     companion object {
         private const val TAG = "PortalCloudClient"
+        private const val MODELS_LOAD_WARNING_MESSAGE = "Couldn't load models from Mobilerun. Try again."
         const val DEFAULT_MODEL_ID = "mobilerun/mobile-agent-fast"
         const val DEFAULT_REASONING = false
         const val DEFAULT_VISION = false
@@ -826,7 +827,7 @@ class PortalCloudClient(
                 callback(
                     PortalModelsLoadResult(
                         models = emptyList(),
-                        warningMessage = "Couldn't load models from Mobilerun. Try again.",
+                        warningMessage = MODELS_LOAD_WARNING_MESSAGE,
                         loadedFromServer = false,
                     ),
                 )
@@ -839,7 +840,7 @@ class PortalCloudClient(
                         callback(
                             PortalModelsLoadResult(
                                 models = emptyList(),
-                                warningMessage = "Couldn't load models from Mobilerun. Try again.",
+                                warningMessage = MODELS_LOAD_WARNING_MESSAGE,
                                 loadedFromServer = false,
                             ),
                         )
@@ -851,7 +852,7 @@ class PortalCloudClient(
                         callback(
                             PortalModelsLoadResult(
                                 models = emptyList(),
-                                warningMessage = "Couldn't load models from Mobilerun. Try again.",
+                                warningMessage = MODELS_LOAD_WARNING_MESSAGE,
                                 loadedFromServer = false,
                             ),
                         )

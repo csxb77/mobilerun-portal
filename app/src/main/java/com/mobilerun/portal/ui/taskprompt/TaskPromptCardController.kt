@@ -75,8 +75,6 @@ class TaskPromptCardController(
         get() = binding.taskPromptSubmitButton
     private val submitProgress: CircularProgressIndicator
         get() = binding.taskPromptSubmitProgress
-    private val retryModelsButton: MaterialButton
-        get() = binding.taskPromptRetryModelsButton
 
     private var currentSettings = PortalTaskSettings()
     private var isModelsLoading = false
@@ -97,7 +95,7 @@ class TaskPromptCardController(
         cancelTaskButton.setOnClickListener {
             onCancelTask()
         }
-        retryModelsButton.setOnClickListener {
+        binding.taskPromptRetryModelsButton.setOnClickListener {
             onRetryModels()
         }
         returnToPortalSwitch.setOnCheckedChangeListener { _, isChecked ->
@@ -162,8 +160,9 @@ class TaskPromptCardController(
     }
 
     fun setModelRetryVisible(visible: Boolean) {
-        retryModelsButton.visibility = if (visible) View.VISIBLE else View.GONE
-        retryModelsButton.isEnabled = visible && !isModelsLoading && isFormEnabled
+        val retryButton = binding.taskPromptRetryModelsButton
+        retryButton.visibility = if (visible) View.VISIBLE else View.GONE
+        retryButton.isEnabled = visible && !isModelsLoading && isFormEnabled
     }
 
     fun setSubmissionEnabled(enabled: Boolean) {
@@ -247,8 +246,8 @@ class TaskPromptCardController(
             taskState?.canCancel == true && taskState?.cancelInFlight != true
         historyButton.isEnabled = isHistoryEnabled
         historyButton.alpha = if (isHistoryEnabled) 1f else 0.5f
-        retryModelsButton.isEnabled =
-            retryModelsButton.visibility == View.VISIBLE && !isModelsLoading && isFormEnabled
+        val retryButton = binding.taskPromptRetryModelsButton
+        retryButton.isEnabled = retryButton.visibility == View.VISIBLE && !isModelsLoading && isFormEnabled
     }
 
     private fun buildDraft(): PortalTaskDraft? {
