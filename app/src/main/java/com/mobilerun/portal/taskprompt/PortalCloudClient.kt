@@ -51,6 +51,7 @@ data class PortalBalanceInfo(
     val balance: Int,
     val usage: Int,
     val nextReset: String?,
+    val unlimited: Boolean = false,
 )
 
 data class PortalTaskStatusSuccess(
@@ -116,6 +117,7 @@ class PortalCloudClient(
         const val DEFAULT_EXECUTION_TIMEOUT = 1000
         internal const val LAUNCH_RECOVERY_WINDOW_MS = 8_000L
         internal const val LAUNCH_RECOVERY_RETRY_INTERVAL_MS = 1_000L
+        private const val MAX_PLAIN_ERROR_DETAIL_CHARS = 280
 
         private const val SUPPORTED_JOIN_PATH = "/v1/providers/personal/join"
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
@@ -467,7 +469,7 @@ class PortalCloudClient(
             authToken: String,
         ): Request {
             return Request.Builder()
-                .url("${cloudBaseUrl.trimEnd('/')}/api/billing/balance")
+                .url("${cloudBaseUrl.trimEnd('/')}/api/commerce/balance")
                 .addHeader("Authorization", "Bearer $authToken")
                 .get()
                 .build()
@@ -565,20 +567,35 @@ class PortalCloudClient(
             }
         }
 
-        private fun parseErrorDetail(body: String?): String? {
+        fun parseErrorDetail(body: String?): String? {
             if (body.isNullOrBlank()) return null
 
-            return try {
-                if (body.trim().startsWith("{")) {
-                    val json = JSONObject(body)
+            val trimmed = body.trim()
+            return if (trimmed.startsWith("{")) {
+                try {
+                    val json = JSONObject(trimmed)
                     listOf("detail", "message", "error", "title")
-                        .mapNotNull { key -> json.optString(key).takeIf { it.isNotBlank() } }
+                        .mapNotNull { key -> sanitizeErrorDetail(json.opt(key) as? String) }
                         .firstOrNull()
-                } else {
-                    body.trim()
+                } catch (_: Exception) {
+                    null
                 }
-            } catch (_: Exception) {
-                body.trim()
+            } else {
+                sanitizeErrorDetail(trimmed)
+            }
+        }
+
+        // Retired cloud endpoints fall through to the Next.js web app, which answers
+        // with a full HTML 404 page; markup, raw JSON, or anything page-sized must
+        // never surface as an error message — whether bare or wrapped in a JSON field.
+        private fun sanitizeErrorDetail(value: String?): String? {
+            val detail = value?.trim().orEmpty()
+            return detail.takeIf {
+                it.isNotBlank() &&
+                    !it.startsWith("<") &&
+                    !it.startsWith("{") &&
+                    !it.startsWith("[") &&
+                    it.length <= MAX_PLAIN_ERROR_DETAIL_CHARS
             }
         }
 
@@ -591,12 +608,16 @@ class PortalCloudClient(
         }
 
         fun parseBalanceInfo(body: String): PortalBalanceInfo? {
+            // Accepts both the commerce shape {"credits":{"remaining","used","unlimited"}}
+            // and the legacy flat {"balance","usage"} shape.
             return try {
                 val root = JSONObject(body)
+                val credits = root.optJSONObject("credits")
                 PortalBalanceInfo(
-                    balance = if (root.has("balance") && !root.isNull("balance")) root.optInt("balance") else 0,
-                    usage = if (root.has("usage") && !root.isNull("usage")) root.optInt("usage") else 0,
+                    balance = credits?.let { optInt(it, "remaining") } ?: optInt(root, "balance") ?: 0,
+                    usage = credits?.let { optInt(it, "used") } ?: optInt(root, "usage") ?: 0,
                     nextReset = firstNonBlankString(root, "nextReset", "next_reset_at"),
+                    unlimited = credits?.let { optBoolean(it, "unlimited") } ?: false,
                 )
             } catch (_: Exception) {
                 null
@@ -618,7 +639,15 @@ class PortalCloudClient(
 
         private fun optInt(json: JSONObject, vararg keys: String): Int? {
             return keys.firstNotNullOfOrNull { key ->
-                if (json.has(key) && !json.isNull(key)) json.optInt(key) else null
+                if (json.has(key) && !json.isNull(key)) {
+                    // optInt wraps values beyond Int range (e.g. JS MAX_SAFE_INTEGER
+                    // sentinels) into negative numbers; clamp instead.
+                    json.optLong(key)
+                        .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())
+                        .toInt()
+                } else {
+                    null
+                }
             }
         }
 

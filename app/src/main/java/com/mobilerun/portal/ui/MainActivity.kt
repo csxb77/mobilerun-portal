@@ -467,10 +467,14 @@ class MainActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener {
 
         val info = state.info
         val balanceLine = info?.let {
-            getString(
-                R.string.credits_balance_line,
-                formatCreditsCount(info.balance),
-            )
+            if (info.unlimited) {
+                getString(R.string.credits_balance_unlimited)
+            } else {
+                getString(
+                    R.string.credits_balance_line,
+                    formatCreditsCount(info.balance),
+                )
+            }
         }?.takeIf { it.isNotBlank() }
         val usageLine = info?.let {
             getString(

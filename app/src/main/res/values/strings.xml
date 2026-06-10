@@ -289,6 +289,7 @@
     <string name="credits_card_subtitle">Track the credits available on this account.</string>
     <string name="credits_refresh_action">Refresh</string>
     <string name="credits_balance_line">%1$s credits remaining</string>
+    <string name="credits_balance_unlimited">Unlimited credits</string>
     <string name="credits_usage_line">%1$s credits used</string>
     <string name="credits_no_reset_scheduled">No reset scheduled</string>
     <string name="credits_loading">Loading credits…</string>

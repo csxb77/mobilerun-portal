@@ -441,7 +441,7 @@ class PortalCloudClientTest {
             authToken = "token-abc",
         )
 
-        assertEquals("https://cloud.mobilerun.ai/api/billing/balance", request.url.toString())
+        assertEquals("https://cloud.mobilerun.ai/api/commerce/balance", request.url.toString())
         assertEquals("Bearer token-abc", request.header("Authorization"))
     }
 
@@ -577,6 +577,53 @@ class PortalCloudClientTest {
     }
 
     @Test
+    fun parseBalanceInfo_readsCommerceCreditsShape() {
+        val body = """
+            {
+              "credits": { "included": 500, "used": 60, "remaining": 440, "unlimited": false },
+              "topUpCredits": null,
+              "devices": []
+            }
+        """.trimIndent()
+
+        val result = PortalCloudClient.parseBalanceInfo(body)
+
+        requireNotNull(result)
+        assertEquals(440, result.balance)
+        assertEquals(60, result.usage)
+        assertNull(result.nextReset)
+        assertFalse(result.unlimited)
+    }
+
+    @Test
+    fun parseBalanceInfo_flagsUnlimitedAccounts() {
+        val body = """
+            {
+              "credits": { "included": 0, "used": 12, "remaining": null, "unlimited": true },
+              "topUpCredits": null,
+              "devices": []
+            }
+        """.trimIndent()
+
+        val result = PortalCloudClient.parseBalanceInfo(body)
+
+        requireNotNull(result)
+        assertTrue(result.unlimited)
+        assertEquals(0, result.balance)
+        assertEquals(12, result.usage)
+    }
+
+    @Test
+    fun parseBalanceInfo_clampsCountsBeyondIntRange() {
+        val body = """{ "credits": { "used": 0, "remaining": 9007199254740991, "unlimited": false } }"""
+
+        val result = PortalCloudClient.parseBalanceInfo(body)
+
+        requireNotNull(result)
+        assertEquals(Int.MAX_VALUE, result.balance)
+    }
+
+    @Test
     fun parseBalanceInfo_readsBalanceUsageAndNextReset() {
         val body = """
             {
@@ -626,6 +673,59 @@ class PortalCloudClientTest {
 
         requireNotNull(result)
         assertNull(result.nextReset)
+    }
+
+    @Test
+    fun parseErrorDetail_suppressesHtmlBodies() {
+        val body = """<!DOCTYPE html><html lang="en"><head><script src="/_next/static/chunks/webpack.js"></script></head><body>404</body></html>"""
+
+        assertNull(PortalCloudClient.parseErrorDetail(body))
+    }
+
+    @Test
+    fun parseErrorDetail_suppressesPageSizedPlainText() {
+        val body = "x".repeat(2_000)
+
+        assertNull(PortalCloudClient.parseErrorDetail(body))
+    }
+
+    @Test
+    fun parseErrorDetail_keepsShortPlainTextBodies() {
+        assertEquals("404 page not found", PortalCloudClient.parseErrorDetail("404 page not found\n"))
+    }
+
+    @Test
+    fun parseErrorDetail_readsJsonErrorField() {
+        assertEquals("Unauthorized", PortalCloudClient.parseErrorDetail("""{"error":"Unauthorized"}"""))
+    }
+
+    @Test
+    fun parseErrorDetail_returnsNullForMalformedJson() {
+        assertNull(PortalCloudClient.parseErrorDetail("{"))
+    }
+
+    @Test
+    fun parseErrorDetail_suppressesHtmlWrappedInJson() {
+        assertNull(PortalCloudClient.parseErrorDetail("""{"message":"<html><body>Server error page</body></html>"}"""))
+    }
+
+    @Test
+    fun parseErrorDetail_suppressesPageSizedJsonDetail() {
+        assertNull(PortalCloudClient.parseErrorDetail("""{"message":"${"x".repeat(2_000)}"}"""))
+    }
+
+    @Test
+    fun parseErrorDetail_skipsNullAndNonStringJsonValues() {
+        assertEquals(
+            "Real error",
+            PortalCloudClient.parseErrorDetail("""{"detail":null,"message":"Real error"}"""),
+        )
+        assertNull(PortalCloudClient.parseErrorDetail("""{"error":{"code":404}}"""))
+    }
+
+    @Test
+    fun parseErrorDetail_suppressesJsonArrayBodies() {
+        assertNull(PortalCloudClient.parseErrorDetail("""["Invalid token"]"""))
     }
 
     @Test
