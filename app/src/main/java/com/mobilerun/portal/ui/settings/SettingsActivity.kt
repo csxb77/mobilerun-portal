@@ -682,10 +682,14 @@ class SettingsActivity : AppCompatActivity(), ConfigManager.ConfigChangeListener
         val creditsState = PortalBalanceRepository.snapshot(currentCreditsFingerprint(authToken, cloudBaseUrl))
         val info = if (cloudBaseUrl != null) creditsState.info else null
         val balanceLine = info?.let {
-            getString(
-                com.mobilerun.portal.R.string.credits_balance_line,
-                formatCreditsCount(info.balance),
-            )
+            if (info.unlimited) {
+                getString(com.mobilerun.portal.R.string.credits_balance_unlimited)
+            } else {
+                getString(
+                    com.mobilerun.portal.R.string.credits_balance_line,
+                    formatCreditsCount(info.balance),
+                )
+            }
         }?.takeIf { it.isNotBlank() }
         val usageLine = info?.let {
             getString(
