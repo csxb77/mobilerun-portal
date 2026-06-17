@@ -49,6 +49,26 @@ class ApiHandlerTest {
     }
 
     @Test
+    fun treeReads_returnErrorWhenServiceConnectedButTreeIsEmpty() {
+        // Regression: the a11y service can be connected (hasAccessibilityService
+        // == true) yet deliver an empty tree (rootInActiveWindow null / windows
+        // filtered out). getTree/getState used to return Success with an empty
+        // list, which an agent misreads as "the screen has nothing on it".
+        // They must fail loud with a recovery hint instead.
+        val stateRepo = mockk<StateRepository>(relaxed = true)
+        every { stateRepo.hasAccessibilityService } returns true
+        every { stateRepo.getVisibleElements() } returns emptyList()
+        val handler = createHandler(stateRepo = stateRepo, ime = null)
+
+        val tree = handler.getTree()
+        val state = handler.getState()
+        assertEquals(true, tree is ApiResponse.Error)
+        assertEquals(true, state is ApiResponse.Error)
+        assertEquals(true, (tree as ApiResponse.Error).message.contains("empty"))
+        assertEquals(true, (state as ApiResponse.Error).message.contains("empty"))
+    }
+
+    @Test
     fun nonAccessibilityReads_stillWorkWhenStateRepoHasNoService() {
         val handler = createHandler(stateRepo = StateRepository(service = null), ime = null)
 
