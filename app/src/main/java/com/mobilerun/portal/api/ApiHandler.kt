@@ -75,6 +75,7 @@ class ApiHandler(
         private const val ENABLE_UI_STOP_FALLBACK = true
         private const val FORCE_STOP_SCREEN_READY_TIMEOUT_MS = 5000L
         private const val ACCESSIBILITY_SERVICE_NOT_AVAILABLE = "Accessibility service not available"
+        private const val A11Y_READ_TIMEOUT_MS = 2_000L
         private const val EMPTY_TREE_MESSAGE =
             "Accessibility tree is empty: the service is connected but returned no UI " +
                 "nodes (no active window / root filtered out). Toggle Mobilerun " +
@@ -90,6 +91,14 @@ class ApiHandler(
 
     private val installLock = Any()
     private val fileOperations: FileOperations by lazy { FileOperations() }
+
+    // Bounds a11y reads so a wedged binder can't hang HTTP workers.
+    private val a11yReads = A11yReadGate()
+
+    /** Release the a11y read gate's dedicated thread. Call on service teardown. */
+    fun close() {
+        a11yReads.close()
+    }
     val applicationContext: Context
         get() = context.applicationContext
 
@@ -140,7 +149,14 @@ class ApiHandler(
         }
     }
 
-    fun getTree(): ApiResponse {
+    // The five accessibility reads below run through a11yReads.wrap so a wedged
+    // a11y binder times out (returning the last good snapshot, degraded) instead
+    // of hanging the HTTP worker. Filter is part of the cache key so filtered and
+    // unfiltered full-tree snapshots never cross-contaminate.
+    fun getTree(): ApiResponse =
+        a11yReads.wrap("a11y_tree", A11Y_READ_TIMEOUT_MS) { getTreeUncached() }
+
+    private fun getTreeUncached(): ApiResponse {
         requireAccessibilityService()?.let { return it }
         val elements = stateRepo.getVisibleElements()
         // Empty only signals a fault when there is also no active window/root
@@ -153,20 +169,29 @@ class ApiHandler(
         return ApiResponse.Success(JSONArray(json).toString())
     }
 
-    fun getTreeFull(filter: Boolean): ApiResponse {
+    fun getTreeFull(filter: Boolean): ApiResponse =
+        a11yReads.wrap("a11y_tree_full:filter=$filter", A11Y_READ_TIMEOUT_MS) { getTreeFullUncached(filter) }
+
+    private fun getTreeFullUncached(filter: Boolean): ApiResponse {
         requireAccessibilityService()?.let { return it }
         val tree = stateRepo.getFullTree(filter)
             ?: return ApiResponse.Error("No active window or root filtered out")
         return ApiResponse.Success(tree.toString())
     }
 
-    fun getPhoneState(): ApiResponse {
+    fun getPhoneState(): ApiResponse =
+        a11yReads.wrap("phone_state", A11Y_READ_TIMEOUT_MS) { getPhoneStateUncached() }
+
+    private fun getPhoneStateUncached(): ApiResponse {
         requireAccessibilityService()?.let { return it }
         val state = stateRepo.getPhoneState()
         return ApiResponse.Success(JsonBuilders.phoneStateToJson(state).toString())
     }
 
-    fun getState(): ApiResponse {
+    fun getState(): ApiResponse =
+        a11yReads.wrap("state", A11Y_READ_TIMEOUT_MS) { getStateUncached() }
+
+    private fun getStateUncached(): ApiResponse {
         requireAccessibilityService()?.let { return it }
         val elements = stateRepo.getVisibleElements()
         if (elements.isEmpty() && !stateRepo.hasActiveRoot()) {
@@ -182,7 +207,10 @@ class ApiHandler(
         return ApiResponse.Success(combined.toString())
     }
 
-    fun getStateFull(filter: Boolean): ApiResponse {
+    fun getStateFull(filter: Boolean): ApiResponse =
+        a11yReads.wrap("state_full:filter=$filter", A11Y_READ_TIMEOUT_MS) { getStateFullUncached(filter) }
+
+    private fun getStateFullUncached(filter: Boolean): ApiResponse {
         requireAccessibilityService()?.let { return it }
         val tree = stateRepo.getFullTree(filter)
             ?: return ApiResponse.Error("No active window or root filtered out")
