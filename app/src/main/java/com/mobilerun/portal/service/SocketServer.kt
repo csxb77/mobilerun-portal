@@ -25,9 +25,16 @@ class SocketServer(
     companion object {
         private const val TAG = "MobilerunSocketServer"
         private const val DEFAULT_PORT = 8080
-        private const val THREAD_POOL_SIZE = 5
+        // Request handlers run on a bounded pool that is SEPARATE from the
+        // acceptor thread, so a few slow/wedged handlers can't starve accept()
+        // (which would otherwise let /ping die along with /state).
+        private const val HANDLER_POOL_SIZE = 8
+        private const val HANDLER_QUEUE_CAPACITY = 32
+        private const val CLIENT_SOCKET_TIMEOUT_MS = 15_000
+        private const val ACCEPT_TIMEOUT_MS = 1_000
         private const val HTTP_STATUS_OK = 200
         private const val HTTP_REASON_OK = "OK"
+        private const val HTTP_STATUS_SERVICE_UNAVAILABLE = 503
         private const val HTTP_STATUS_BAD_REQUEST = 400
         private const val HTTP_STATUS_UNAUTHORIZED = 401
         private const val AUTHORIZATION_HEADER_PREFIX = "Authorization:"
@@ -39,6 +46,7 @@ class SocketServer(
     private var serverSocket: ServerSocket? = null
     private var isRunning = AtomicBoolean(false)
     private var executorService: ExecutorService? = null
+    private var acceptorThread: Thread? = null
     private var port: Int = DEFAULT_PORT
 
     fun start(port: Int = DEFAULT_PORT): Boolean {
@@ -51,12 +59,24 @@ class SocketServer(
         Log.i(TAG, "Starting socket server on port $port...")
 
         return try {
-            executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE)
-            serverSocket = ServerSocket(port)
+            // Bounded handler pool: bounded queue + a CallerRuns-free reject so a
+            // request burst surfaces a 503 instead of growing an unbounded queue.
+            executorService = java.util.concurrent.ThreadPoolExecutor(
+                HANDLER_POOL_SIZE,
+                HANDLER_POOL_SIZE,
+                0L,
+                java.util.concurrent.TimeUnit.MILLISECONDS,
+                java.util.concurrent.ArrayBlockingQueue(HANDLER_QUEUE_CAPACITY),
+                java.util.concurrent.ThreadPoolExecutor.AbortPolicy(),
+            )
+            serverSocket = ServerSocket(port).apply { soTimeout = ACCEPT_TIMEOUT_MS }
             isRunning.set(true)
 
-            executorService?.submit {
-                acceptConnections()
+            // Accept on a DEDICATED thread, never on the handler pool, so handlers
+            // can never starve the acceptor.
+            acceptorThread = Thread({ acceptConnections() }, "socket-acceptor").apply {
+                isDaemon = true
+                start()
             }
 
             Log.i(TAG, "Socket server started successfully on port $port")
@@ -64,7 +84,7 @@ class SocketServer(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start socket server on port $port", e)
             isRunning.set(false)
-            executorService?.shutdown()
+            executorService?.shutdownNow()
             executorService = null
             false
         }
@@ -77,7 +97,9 @@ class SocketServer(
 
         try {
             serverSocket?.close()
-            executorService?.shutdown()
+            acceptorThread?.interrupt()
+            acceptorThread = null
+            executorService?.shutdownNow()
             executorService = null
             Log.i(TAG, "Socket server stopped")
         } catch (e: Exception) {
@@ -91,9 +113,28 @@ class SocketServer(
     private fun acceptConnections() {
         while (isRunning.get()) {
             try {
-                val clientSocket = serverSocket?.accept() ?: break
-                executorService?.submit {
-                    handleClient(clientSocket)
+                val clientSocket = try {
+                    serverSocket?.accept() ?: break
+                } catch (e: java.net.SocketTimeoutException) {
+                    continue // periodic wake to re-check isRunning
+                }
+                // Bound per-request reads so a stuck client/handler can't own a
+                // worker forever.
+                try { clientSocket.soTimeout = CLIENT_SOCKET_TIMEOUT_MS } catch (_: Exception) {}
+                try {
+                    executorService?.submit { handleClient(clientSocket) }
+                } catch (e: java.util.concurrent.RejectedExecutionException) {
+                    // Pool + queue full: fail fast with 503 instead of blocking.
+                    Log.w(TAG, "handler pool saturated; rejecting request with 503")
+                    try {
+                        sendErrorResponse(
+                            clientSocket.getOutputStream(),
+                            HTTP_STATUS_SERVICE_UNAVAILABLE,
+                            "Server busy",
+                        )
+                    } catch (_: Exception) {} finally {
+                        try { clientSocket.close() } catch (_: Exception) {}
+                    }
                 }
             } catch (e: SocketException) {
                 if (isRunning.get()) {

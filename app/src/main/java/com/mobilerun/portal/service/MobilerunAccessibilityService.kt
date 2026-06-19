@@ -55,6 +55,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         const val TAG = "MobilerunAccessibility"
         const val ACTION_DISABLE_LOCAL_WS_SERVER =
             "com.mobilerun.portal.action.DISABLE_LOCAL_WS_SERVER"
+        @Volatile
         private var instance: MobilerunAccessibilityService? = null
         private const val MIN_ELEMENT_SIZE = 5
         private const val TOAST_DEBOUNCE_MS = 60_000L
@@ -202,6 +203,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
     // TODO Make nullable
     private lateinit var actionDispatcher: ActionDispatcher
     private var socketServer: SocketServer? = null
+    private var apiHandler: ApiHandler? = null
     private var websocketServer: PortalWebSocketServer? = null
 
     // Periodic update state
@@ -246,6 +248,7 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
             this
         )
 
+        this.apiHandler = apiHandler
         actionDispatcher = ActionDispatcher(apiHandler)
         socketServer = SocketServer(apiHandler, configManager, actionDispatcher)
 
@@ -1585,6 +1588,17 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
         hideLocalWebSocketConnectionNotification()
     }
 
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        // The framework unbinds when the service is disabled/torn down. Drop the
+        // singleton so getInstance() can't hand callers a service whose a11y
+        // connection is gone, and release the read-gate thread. (Do NOT do this
+        // in onInterrupt — interrupt is not an unbind.)
+        Log.d(TAG, "Accessibility service unbound")
+        if (instance === this) instance = null
+        apiHandler?.close()
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         stopPeriodicUpdates()
@@ -1594,7 +1608,8 @@ class MobilerunAccessibilityService : AccessibilityService(), ConfigManager.Conf
 
         clearVisibleElementSnapshot()
         configManager.removeListener(this)
-        instance = null
+        apiHandler?.close()
+        if (instance === this) instance = null
         Log.d(TAG, "Accessibility service destroyed")
     }
 
