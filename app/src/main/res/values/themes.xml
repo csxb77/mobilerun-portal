@@ -60,8 +60,9 @@
     </style>
 
     <style name="Widget.Mobilerun.Switch" parent="Widget.MaterialComponents.CompoundButton.Switch">
-        <item name="thumbTint">@color/mobilerun_primary</item>
-        <item name="trackTint">@color/mobilerun_primary_light</item>
+        <item name="useMaterialThemeColors">false</item>
+        <item name="thumbTint">@color/mobilerun_switch_thumb_tint</item>
+        <item name="trackTint">@color/mobilerun_switch_track_tint</item>
     </style>
 
     <style name="Widget.Mobilerun.TextInputLayout" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
