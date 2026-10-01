@@ -14,12 +14,7 @@
 [![Discord](https://img.shields.io/discord/1360219330318696488?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/ZZbKEZZkwK)
 [![Documentation](https://img.shields.io/badge/Documentation-📕-blue)](https://docs.droidrun.ai)
 [![Twitter Follow](https://img.shields.io/twitter/follow/mobilerun_ai?style=social)](https://x.com/mobilerun_ai)
-
-<a href="https://github.com/droidrun/mobilerun-portal/releases" target="_blank">
-  <img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" width="200">
-</a>
-
-<br><br>
+[![Get it on GitHub](https://img.shields.io/badge/Get%20it%20on-GitHub-181717?logo=github&logoColor=white)](https://github.com/droidrun/mobilerun-portal/releases)
 
 <img src="./static/mobilerun-demo.gif" alt="Mobilerun automating a phone with natural language" width="320">
 
