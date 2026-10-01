@@ -8,22 +8,22 @@
   <br><br><br>
 </p>
 
+<div align="center">
+
 [![GitHub stars](https://img.shields.io/github/stars/droidrun/mobilerun-portal?style=social)](https://github.com/droidrun/mobilerun-portal/stargazers)
 [![Discord](https://img.shields.io/discord/1360219330318696488?color=7289DA&label=Discord&logo=discord&logoColor=white)](https://discord.gg/ZZbKEZZkwK)
 [![Documentation](https://img.shields.io/badge/Documentation-📕-blue)](https://docs.droidrun.ai)
 [![Twitter Follow](https://img.shields.io/twitter/follow/mobilerun_ai?style=social)](https://x.com/mobilerun_ai)
 
-<p>
-  <br><br>
-  <a href="https://github.com/droidrun/mobilerun-portal/releases" target="_blank">
-      <img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" style="width:200px;height:auto;">
-  </a>
-  <br><br>
-</p>
+<a href="https://github.com/droidrun/mobilerun-portal/releases" target="_blank">
+  <img src="https://raw.githubusercontent.com/Kunzisoft/Github-badge/main/get-it-on-github.png" alt="Get it on GitHub" width="200">
+</a>
 
-<p align="center">
-  <img src="./static/mobilerun-demo.gif" alt="Mobilerun automating a phone with natural language" width="320">
-</p>
+<br><br>
+
+<img src="./static/mobilerun-demo.gif" alt="Mobilerun automating a phone with natural language" width="320">
+
+</div>
 
 ## 👁️ Overview
 Mobilerun Portal is an Android accessibility service that provides real-time visual feedback and data collection for UI elements on the screen. It creates an interactive overlay that highlights clickable, checkable, editable, scrollable, and focusable elements, making it an invaluable tool for UI testing, automation development, and accessibility assessment.
