@@ -21,6 +21,10 @@
   <br><br>
 </p>
 
+<p align="center">
+  <img src="./static/mobilerun-demo.gif" alt="Mobilerun automating a phone with natural language" width="320">
+</p>
+
 ## 👁️ Overview
 Mobilerun Portal is an Android accessibility service that provides real-time visual feedback and data collection for UI elements on the screen. It creates an interactive overlay that highlights clickable, checkable, editable, scrollable, and focusable elements, making it an invaluable tool for UI testing, automation development, and accessibility assessment.
 
